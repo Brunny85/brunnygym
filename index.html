@@ -31,7 +31,7 @@ import {
   Home, Dumbbell, ClipboardList, Library as LibraryIcon,
   Play, Plus, Check, X, Trash2, ChevronLeft, Flame, TrendingUp,
   Timer as TimerIcon, Pause, RotateCcw, Pencil, Search, Activity,
-  ChevronRight, CheckCircle2, Save, Database, Download, Upload, Copy, CalendarDays, Layers, History as HistoryIcon
+  ChevronRight, CheckCircle2, Save, Database, Download, Upload, Copy, CalendarDays, Layers, History as HistoryIcon, GripVertical
 } from "lucide-react";
 
 /* ============================================================
@@ -169,7 +169,21 @@ const CSS = `
 .gt .setrow.done .setno{ color:var(--good); }
 .gt .setrow.warm .setno{ color:#B8791E; font-size:12px; }
 .gt .setrow.warm .inp{ background:#FBF4E4; border-color:#EFE1C4; }
+.gt .setdel{ display:flex; align-items:center; justify-content:center; width:30px; height:36px; color:var(--steel); background:none; border:none; }
+.gt .setdel:active{ color:var(--accent); }
+.gt .excollapsed{ display:flex; align-items:center; gap:11px; width:100%; padding:13px 14px; background:var(--surface); border:1px solid var(--line); border-radius:16px; margin-bottom:12px; }
+.gt .excollapsed.alldone{ background:#F2F8F3; border-color:#D7EADC; }
+.gt .excollapsed .donedot{ width:24px; height:24px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:var(--surface2); color:var(--steel); flex:none; }
+.gt .excollapsed .donedot.on{ background:var(--good); color:#fff; }
+.gt .excollapsed .colmeta{ display:block; font-size:10.5px; color:var(--steel); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .gt .progresshint{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--good); font-weight:700; margin-top:9px; padding:8px 10px; background:#EAF6EE; border-radius:9px; }
+.gt .reorder{ margin-bottom:8px; }
+.gt .reorder-row{ display:flex; align-items:center; gap:8px; padding:9px 10px; margin-bottom:6px; border:1px solid var(--line); border-radius:11px; background:var(--surface); }
+.gt .reorder-row.dragging{ background:var(--ink); color:#fff; box-shadow:0 6px 18px -6px rgba(0,0,0,.35); }
+.gt .reorder-row .draghandle{ display:flex; align-items:center; justify-content:center; width:30px; height:30px; color:var(--steel); cursor:grab; flex:none; background:none; }
+.gt .reorder-row.dragging .draghandle{ color:#fff; cursor:grabbing; }
+.gt .reorder-row .ord{ font-size:11px; color:var(--steel); width:16px; text-align:center; flex:none; }
+.gt .reorder-row.dragging .ord{ color:#fff; }
 .gt .inp{ width:100%; background:var(--surface2); border:1px solid var(--line); border-radius:9px; padding:11px 8px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; text-align:center; color:var(--ink); }
 .gt .inp:focus{ outline:2px solid var(--accent); outline-offset:-1px; background:#fff; }
 .gt .setrow.done .inp{ background:#EAF7F0; border-color:#BfE6D2; }
@@ -178,13 +192,23 @@ const CSS = `
 .gt .addset{ display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:11px; margin-top:4px; border:1px dashed var(--line); border-radius:10px; color:var(--ink2); font-weight:700; font-size:12px; letter-spacing:.5px; text-transform:uppercase; background:transparent; }
 
 /* rest timer bar */
-.gt .restbar{ position:fixed; bottom:74px; left:50%; transform:translateX(-50%); width:100%; max-width:480px; padding:0 16px; z-index:40; }
-.gt .restinner{ background:var(--ink); color:#fff; border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:14px; box-shadow:0 8px 24px rgba(0,0,0,.22); }
-.gt .ring{ position:relative; width:52px; height:52px; flex:none; }
-.gt .ring .cd{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:800; font-size:14px; }
-.gt .restbtns{ display:flex; gap:7px; margin-left:auto; }
-.gt .restbtns button{ width:38px; height:38px; border-radius:10px; background:rgba(255,255,255,.12); color:#fff; display:flex; align-items:center; justify-content:center; }
-.gt .restbtns button.wide{ width:auto; padding:0 12px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12px; }
+.gt .restbar{ position:fixed; bottom:78px; left:50%; transform:translateX(-50%); width:100%; max-width:440px; padding:0 14px; z-index:40; animation:restup .28s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes restup{ from{ transform:translate(-50%,16px); opacity:0; } to{ transform:translate(-50%,0); opacity:1; } }
+.gt .restinner{ position:relative; overflow:hidden; background:rgba(18,18,21,.82); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); color:#fff; border:1px solid rgba(255,255,255,.08); border-radius:20px; padding:13px 14px 15px; display:flex; align-items:center; gap:13px; box-shadow:0 16px 40px -10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
+.gt .ring{ position:relative; width:54px; height:54px; flex:none; }
+.gt .ring .cd{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:800; font-size:14.5px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.gt .restlabel{ font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,.45); }
+.gt .restchips{ display:flex; gap:6px; margin-top:7px; }
+.gt .restchips button{ background:transparent; color:rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:4px 11px; font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700; transition:all .15s; }
+.gt .restchips button:active{ background:rgba(255,255,255,.16); color:#fff; }
+.gt .restbtns{ display:flex; gap:6px; margin-left:auto; }
+.gt .restbtns button{ width:38px; height:38px; border-radius:999px; background:rgba(255,255,255,.09); color:#fff; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.07); transition:background .15s; }
+.gt .restbtns button:active{ background:rgba(255,255,255,.2); }
+.gt .restbtns button.wide{ width:auto; padding:0 13px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11.5px; }
+.gt .resttrack{ position:absolute; left:0; right:0; bottom:0; height:3px; background:rgba(255,255,255,.08); }
+.gt .resttrack .fillbar{ height:100%; border-radius:0 3px 3px 0; transition:width 1s linear, background .4s; }
+.gt .restdone .restinner{ animation:restpulse .5s ease 2; }
+@keyframes restpulse{ 50%{ box-shadow:0 0 0 3px rgba(222,52,23,.5), 0 16px 40px -10px rgba(0,0,0,.45); } }
 
 /* bottom nav */
 .gt .nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(255,255,255,.94); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; z-index:50; }
@@ -468,7 +492,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v20";
+const APP_VERSION = "v28";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -963,7 +987,7 @@ export default function App() {
         const ex = exById[id];
         const lastSess = sessions.find((s) => s.entries && s.entries.some((en) => en.exerciseId === id));
         const lastEntry = lastSess ? lastSess.entries.find((en) => en.exerciseId === id) : null;
-        return { exerciseId: id, sets: makeSets(ex, suggestWeight(ex, lastEntry, unit)) };
+        return { exerciseId: id, sets: makeSets(ex, lastEntry, unit) };
       });
     saveActive({ id: uid(), routineId: routine.id, routineName: routine.name, color: routine.color, plannedMin: routine.plannedMin, startedAt: Date.now(), entries });
     setTab("workout");
@@ -1021,7 +1045,7 @@ export default function App() {
           <Dashboard {...{ sessions, exercises, routines, exById, active, unit, dist, setUnit, setDist, setTab, backup }} />
         )}
         {tab === "routines" && (
-          <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist }} />
+          <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault }} />
         )}
         {tab === "workout" && (
           <Workout {...{ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab }} />
@@ -1037,34 +1061,36 @@ export default function App() {
         )}
       </div>
 
-      {rest && (
-        <div className="restbar">
-          <div className="restinner">
-            <div className="ring">
-              <Ring pct={rest.total ? rest.left / rest.total : 0} />
-              <div className="cd mono">{fmtTime(rest.left)}</div>
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", opacity: .6 }}>Rest</div>
-              <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
-                {[60, 90, 120].map((s) => (
-                  <button key={s} className="mono" onClick={() => startRest(s)}
-                    style={{ background: "rgba(255,255,255,.12)", color: "#fff", borderRadius: 7, padding: "5px 9px", fontSize: 11, fontWeight: 700 }}>
-                    {s}s
-                  </button>
-                ))}
+      {rest && (() => {
+        const pct = rest.total ? rest.left / rest.total : 0;
+        const col = rest.left <= 5 ? "#DE3417" : rest.left <= 15 ? "#F2A81E" : "#2FA25A";
+        return (
+          <div className={`restbar ${rest.left === 0 ? "restdone" : ""}`}>
+            <div className="restinner">
+              <div className="ring">
+                <Ring pct={pct} color={col} />
+                <div className="cd">{fmtTime(rest.left)}</div>
               </div>
-            </div>
-            <div className="restbtns">
-              <button className="wide" onClick={() => setRest((r) => ({ ...r, left: r.left + 15 }))}>+15</button>
-              <button onClick={() => setRest((r) => ({ ...r, running: !r.running }))}>
-                {rest.running ? <Pause size={17} /> : <Play size={17} />}
-              </button>
-              <button onClick={() => setRest(null)}><X size={17} /></button>
+              <div style={{ minWidth: 0 }}>
+                <div className="restlabel">{rest.left === 0 ? "Go — next set" : rest.running ? "Resting" : "Paused"}</div>
+                <div className="restchips">
+                  {[60, 90, 120].map((s) => (
+                    <button key={s} onClick={() => startRest(s)}>{s}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="restbtns">
+                <button className="wide" onClick={() => setRest((r) => ({ ...r, left: r.left + 15, running: true }))}>+15</button>
+                <button onClick={() => setRest((r) => ({ ...r, running: !r.running }))}>
+                  {rest.running ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+                <button onClick={() => setRest(null)}><X size={16} /></button>
+              </div>
+              <div className="resttrack"><div className="fillbar" style={{ width: `${pct * 100}%`, background: col }} /></div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <nav className="nav">
         {[
@@ -1089,7 +1115,7 @@ export default function App() {
 }
 
 /* ---------------- shared bits ---------------- */
-function newSet(o = {}) { return { id: uid(), weight: "", reps: "", time: "", distance: "", done: false, warmup: !!o.warmup, target: o.target || "" }; }
+function newSet(o = {}) { return { id: uid(), weight: "", reps: "", time: "", distance: "", done: false, warmup: !!o.warmup, target: o.target || "", phw: o.phw || "", phr: o.phr || "" }; }
 function isCompound(ex) {
   if (ex && typeof ex.compound === "boolean") return ex.compound;
   return /(squat|deadlift|bench press|chest press|overhead press|shoulder press|military press|push press|barbell row|bent[- ]?over row|pendlay|t-bar row|seal row|romanian|rdl|hip thrust|glute bridge|pull[- ]?up|chin[- ]?up|weighted dip|^dip$|lunge|split squat|bulgarian|leg press|hack squat|power clean|clean|snatch|lat pulldown|pulldown|good morning|thruster|floor press|incline barbell press|incline dumbbell press|decline press|landmine press)/i.test((ex && ex.name) || "");
@@ -1098,12 +1124,24 @@ function liftDefaults(ex) {
   return isCompound(ex) ? { warmups: 2, work: 2, lo: 6, hi: 10 } : { warmups: 1, work: 3, lo: 10, hi: 15 };
 }
 function incFor(ex, unit) { const c = isCompound(ex); return unit === "lb" ? (c ? 5 : 2.5) : (c ? 2.5 : 1.25); }
-function makeSets(ex, suggested) {
+function makeSets(ex, lastEntry, unit) {
   if (!ex || ex.category === "cardio") return [newSet()];
   const d = liftDefaults(ex); const out = [];
-  for (let i = 0; i < d.warmups; i++) out.push(newSet({ warmup: true }));
-  for (let i = 0; i < d.work; i++) out.push(newSet({ target: `${d.lo}-${d.hi}` }));
-  if (suggested != null) out.forEach((s) => { if (!s.warmup) s.weight = String(suggested); });
+  const lastW = lastEntry ? lastEntry.sets.filter((s) => s.warmup) : [];
+  const lastS = lastEntry ? lastEntry.sets.filter((s) => !s.warmup) : [];
+  const sugg = suggestWeight(ex, lastEntry, unit);
+  for (let i = 0; i < d.warmups; i++) {
+    const p = lastW[i];
+    out.push(newSet({ warmup: true, phw: p && p.weight ? String(p.weight) : "", phr: p && p.reps ? String(p.reps) : "" }));
+  }
+  for (let i = 0; i < d.work; i++) {
+    const p = lastS[i];
+    out.push(newSet({
+      target: `${d.lo}-${d.hi}`,
+      phw: sugg != null ? String(sugg) : (p && p.weight ? String(p.weight) : ""),
+      phr: p && p.reps ? String(p.reps) : "",
+    }));
+  }
   return out;
 }
 function suggestWeight(ex, lastEntry, unit) {
@@ -1152,13 +1190,14 @@ function beep() {  try {
   } catch {}
   if (navigator.vibrate) navigator.vibrate([160, 60, 160]);
 }
-function Ring({ pct }) {
-  const r = 22, c = 2 * Math.PI * r;
+function Ring({ pct, color = "#DE3417" }) {
+  const r = 24, c = 2 * Math.PI * r;
   return (
-    <svg width="52" height="52" viewBox="0 0 52 52">
-      <circle cx="26" cy="26" r={r} fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="4" />
-      <circle cx="26" cy="26" r={r} fill="none" stroke="#DE3417" strokeWidth="4" strokeLinecap="round"
-        strokeDasharray={c} strokeDashoffset={c * (1 - pct)} transform="rotate(-90 26 26)" />
+    <svg width="54" height="54" viewBox="0 0 54 54">
+      <circle cx="27" cy="27" r={r} fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="3" />
+      <circle cx="27" cy="27" r={r} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c * (1 - pct)} transform="rotate(-90 27 27)"
+        style={{ transition: "stroke-dashoffset 1s linear, stroke .4s" }} />
     </svg>
   );
 }
@@ -1629,6 +1668,19 @@ function Sparkline({ pts }) {
    ROUTINES
    ============================================================ */
 function mName(id) { return (muscleById[id] && muscleById[id].name) || (id ? id[0].toUpperCase() + id.slice(1).replace(/_/g, " ") : ""); }
+// Estimated workout time: per-set execution + rest, plus setup per exercise.
+function estimateMin(routine, exById, restSec = 90) {
+  let sec = 0;
+  (routine.exerciseIds || []).forEach((id) => {
+    const ex = exById[id]; if (!ex) return;
+    if (ex.category === "cardio") { sec += 10 * 60; return; }
+    const d = liftDefaults(ex);
+    sec += d.warmups * (30 + Math.min(60, restSec * 0.6));
+    sec += d.work * (40 + restSec);
+    sec += 75; // setup / transition
+  });
+  return Math.max(5, Math.round(sec / 60 / 5) * 5);
+}
 function schemeText(ex) {
   if (ex.category === "cardio") return "cardio";
   const d = liftDefaults(ex);
@@ -1646,9 +1698,10 @@ function fmtSetLog(s, dist) {
   if (s.reps > 0) return `${s.reps}`;
   return "–";
 }
-function buildWorkoutExport(routine, exById, sessions, dist) {
+function buildWorkoutExport(routine, exById, sessions, dist, restSec) {
   const lines = [`WORKOUT: ${routine.name}`];
-  if (routine.plannedMin) lines.push(`Planned duration: ~${routine.plannedMin} min`);
+  lines.push(`Estimated duration: ~${routine.plannedMin || estimateMin(routine, exById, restSec || 90)} min${routine.plannedMin ? " (planned)" : ""}`);
+  if (restSec) lines.push(`Rest between sets: ${restSec}s (warm-ups ~${Math.round(Math.min(60, restSec * 0.6))}s)`);
   lines.push("Exercises (planned sets/reps):");
   routine.exerciseIds.map((id) => exById[id]).filter(Boolean).forEach((ex) => lines.push(exportExLine(ex)));
   const last = (sessions || []).find((s) => s.routineId === routine.id && s.entries && s.entries.length);
@@ -1658,13 +1711,13 @@ function buildWorkoutExport(routine, exById, sessions, dist) {
   }
   return lines.join("\n");
 }
-function buildRoutineExport(program, routines, exById, sessions, dist) {
+function buildRoutineExport(program, routines, exById, sessions, dist, restSec) {
   const ws = routines.filter((r) => r.programId === program.id);
   const out = [
-    `ROUTINE: ${program.name}`, `${ws.length} workouts`, "",
+    `ROUTINE: ${program.name}`, `${ws.length} workouts · rest between sets ${restSec || 90}s`, "",
     "Please analyse this training routine for muscle balance, weekly volume, progression, and any gaps or redundancy. Sets/reps below are the app defaults (compounds: 2 warm-up + 2 working @ 6-10; isolations: 1 warm-up + 3 working @ 10-15; weight increases when all working sets reach the top of the range).", "",
   ];
-  ws.forEach((r) => { out.push(buildWorkoutExport(r, exById, sessions, dist)); out.push(""); });
+  ws.forEach((r) => { out.push(buildWorkoutExport(r, exById, sessions, dist, restSec)); out.push(""); });
   return out.join("\n");
 }
 function copyToClipboard(text) {
@@ -1672,7 +1725,7 @@ function copyToClipboard(text) {
   try { const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); } catch (e) {}
 }
 
-function Routines({ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist }) {
+function Routines({ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault }) {
   const [editing, setEditing] = useState(null);
   const [editingProg, setEditingProg] = useState(null);
   const [openProg, setOpenProg] = useState(null);
@@ -1728,14 +1781,14 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
         <span className="dot" style={{ background: r.color, width: 9, height: 9, borderRadius: 3, flex: "none" }} />
         <button className="grow wtap" onClick={() => setOpenWorkout(r)}>
           <div className="name" style={{ fontSize: 14.5 }}>{r.name}</div>
-          <div className="sub">{cnt} exercises{r.plannedMin ? ` · ~${r.plannedMin} min` : ""}{last?.durationSec ? ` · last took ${fmtDur(last.durationSec)}` : ""}</div>
+          <div className="sub">{cnt} exercises · ~{r.plannedMin || estimateMin(r, exById, restDefault)} min{last?.durationSec ? ` · last took ${fmtDur(last.durationSec)}` : ""}</div>
         </button>
         <button className="btn dark sm" disabled={!cnt} onClick={() => startWorkout(r)}><Play size={14} /> Start</button>
       </div>
     );
   };
 
-  const Accordion = ({ id, color, name, meta, items, badge, onAddProgramId, actions }) => {
+  const Accordion = ({ id, color, name, meta, items, badge, onAddProgramId, actions, onCopyAll }) => {
     const open = expanded.has(id);
     return (
       <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 12 }}>
@@ -1743,8 +1796,8 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
           <span style={{ width: 5, background: color, flex: "none" }} />
           <button style={{ flex: 1, textAlign: "left", background: "none", padding: "14px 4px 14px 12px", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }} onClick={() => toggle(id)}>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span className="pkgname">{name}{badge && <span className="archbadge">{badge}</span>}</span>
-              <span className="pkgmeta mono">{meta}</span>
+              <span className="pkgname" style={{ display: "block" }}>{name}{badge && <span className="archbadge">{badge}</span>}</span>
+              <span className="pkgmeta mono" style={{ display: "block" }}>{meta}</span>
             </span>
             <ChevronRight size={18} style={{ color: "var(--steel)", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", flex: "none" }} />
           </button>
@@ -1754,6 +1807,7 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
           <div style={{ padding: "0 12px 12px" }}>
             {items.length ? items.map(WCard) : <p className="muted" style={{ padding: "8px 2px" }}>No workouts yet.</p>}
             <button className="addset" onClick={() => setEditing({ name: "", color, exerciseIds: [], programId: onAddProgramId })}><Plus size={15} /> Add workout</button>
+            {onCopyAll && <button className="btn dark sm" style={{ width: "100%", marginTop: 8 }} onClick={onCopyAll}><Copy size={14} /> Copy for AI analysis</button>}
           </div>
         )}
       </div>
@@ -1784,10 +1838,11 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
       {visible.map((p) => {
         const st = progStats(p);
         const items = routines.filter((r) => r.programId === p.id);
-        const planned = items.reduce((a, r) => a + (r.plannedMin || 0), 0);
+        const planned = items.reduce((a, r) => a + (r.plannedMin || estimateMin(r, exById, restDefault)), 0);
         const meta = `${st.count} workouts · ${st.workouts} sessions${planned ? ` · ~${planned}m` : ""}${st.last ? ` · last ${relDay(st.last)}` : ""}`;
         return (
           <Accordion key={p.id} id={p.id} color={p.color} name={p.name} meta={meta} items={items} onAddProgramId={p.id}
+            onCopyAll={() => copyExport(buildRoutineExport(p, routines, exById, sessions, dist, restDefault))}
             badge={p.archived ? "Archived" : null}
             actions={<button className="iconbtn" style={{ border: "none", background: "none", alignSelf: "center", marginRight: 4 }} onClick={() => setOpenProg(p)} title="Details & history"><Activity size={16} /></button>} />
         );
@@ -1804,8 +1859,9 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
       {editing && <RoutineEditor routine={editing} exercises={exercises} onSave={save} onClose={() => setEditing(null)} />}
       {editingProg && <ProgramEditor program={editingProg} routines={routines} onSave={saveProgram} onClose={() => setEditingProg(null)} />}
       {openWorkout && (
-        <WorkoutDetail routine={openWorkout} exById={exById} sessions={sessions}
-          onCopy={() => copyExport(buildWorkoutExport(openWorkout, exById, sessions, dist))}
+        <WorkoutDetail routine={openWorkout} exById={exById} sessions={sessions} restDefault={restDefault}
+          onCopy={() => copyExport(buildWorkoutExport(openWorkout, exById, sessions, dist, restDefault))}
+          onReorder={(rid, order) => saveRt(routines.map((r) => r.id === rid ? { ...r, exerciseIds: order } : r))}
           onStart={(r) => { setOpenWorkout(null); startWorkout(r); }}
           onEdit={(r) => { setOpenWorkout(null); setEditing(r); }}
           onDelete={(id) => { if (window.confirm("Delete this workout?")) del(id); }}
@@ -1813,7 +1869,7 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
       )}
       {openProg && (
         <ProgramSheet program={openProg} routines={routines} sessions={sessions} exById={exById}
-          onCopy={() => copyExport(buildRoutineExport(openProg, routines, exById, sessions, dist))}
+          onCopy={() => copyExport(buildRoutineExport(openProg, routines, exById, sessions, dist, restDefault))}
           onEdit={() => { setEditingProg(openProg); setOpenProg(null); }}
           onArchive={() => archiveProgram(openProg.id, !openProg.archived)}
           onDelete={() => { if (window.confirm("Remove this routine? Its workouts stay, just ungrouped.")) delProgram(openProg.id); }}
@@ -1824,12 +1880,16 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
   );
 }
 
-function WorkoutDetail({ routine, exById, sessions, onStart, onEdit, onDelete, onCopy, onClose }) {
-  const names = routine.exerciseIds.map((id) => exById[id]?.name).filter(Boolean);
+function WorkoutDetail({ routine, exById, sessions, restDefault, onStart, onEdit, onDelete, onCopy, onReorder, onClose }) {
+  const [order, setOrder] = useState(routine.exerciseIds);
+  useEffect(() => { setOrder(routine.exerciseIds); }, [routine.id]);
+  const live = { ...routine, exerciseIds: order };
+  const names = order.map((id) => exById[id]?.name).filter(Boolean);
   const done = (sessions || []).filter((s) => s.routineId === routine.id).sort((a, b) => b.date - a.date);
   const last = done[0];
   const avgMin = done.length ? Math.round(done.reduce((a, s) => a + (s.durationSec || 0), 0) / done.length / 60) : 0;
-  const bmItems = routine.exerciseIds.map((id) => exById[id]).filter((ex) => ex && ex.category !== "cardio").map((ex) => ({ name: ex.name, primary: ex.primary, secondary: ex.secondary, subMuscles: ex.subMuscles || [], weight: 1 }));
+  const bmItems = order.map((id) => exById[id]).filter((ex) => ex && ex.category !== "cardio").map((ex) => ({ name: ex.name, primary: ex.primary, secondary: ex.secondary, subMuscles: ex.subMuscles || [], weight: 1 }));
+  const reorder = (next) => { setOrder(next); onReorder && onReorder(routine.id, next); };
   return (
     <div className="scrim" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -1837,7 +1897,7 @@ function WorkoutDetail({ routine, exById, sessions, onStart, onEdit, onDelete, o
           <div className="tt" style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: routine.color }} />{routine.name}</div>
           <button className="iconbtn" onClick={onClose}><X size={18} /></button>
         </div>
-        <p className="muted" style={{ marginTop: 2, marginBottom: 12 }}>{names.length} exercises{routine.plannedMin ? ` · ~${routine.plannedMin} min planned` : ""}</p>
+        <p className="muted" style={{ marginTop: 2, marginBottom: 12 }}>{names.length} exercises · ~{routine.plannedMin || estimateMin(live, exById, restDefault)} min {routine.plannedMin ? "planned" : "est."}</p>
         {last?.durationSec ? (
           <div className="stats" style={{ marginBottom: 12 }}>
             <div className="stat"><div className="k">Last took</div><div className="v mono">{fmtDur(last.durationSec)}</div></div>
@@ -1846,10 +1906,15 @@ function WorkoutDetail({ routine, exById, sessions, onStart, onEdit, onDelete, o
             {done.length > 1 ? <div className="stat"><div className="k">Sessions</div><div className="v mono">{done.length}</div></div> : null}
           </div>
         ) : null}
-        <button className="btn acc" disabled={!names.length} onClick={() => onStart(routine)}><Play size={16} /> Start workout</button>
+        <button className="btn acc" disabled={!names.length} onClick={() => onStart(live)}><Play size={16} /> Start workout</button>
         <div className="card" style={{ marginTop: 12 }}>
-          <div className="rex">{names.join(" · ") || "No exercises yet"}</div>
-          <CoverageStrip routine={routine} exById={exById} />
+          <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 8 }}>Exercises · drag to reorder</div>
+          {order.length ? (
+            <ReorderList
+              items={order.map((id) => { const e = exById[id]; return { id, name: e ? e.name : id, sub: e ? (e.primary || []).map((m) => muscleById[m]?.name).filter(Boolean).join(", ") : "" }; })}
+              onReorder={reorder} />
+          ) : <p className="muted">No exercises yet.</p>}
+          <CoverageStrip routine={live} exById={exById} />
           {bmItems.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 4 }}>Body map</div>
@@ -2016,6 +2081,47 @@ function CoverageStrip({ routine, exById }) {
   );
 }
 
+function ReorderList({ items, onReorder, onRemove }) {
+  const [dragId, setDragId] = useState(null);
+  const ref = useRef(null);
+  const itemsRef = useRef(items); itemsRef.current = items;
+  useEffect(() => {
+    if (dragId == null) return;
+    const onMove = (ev) => {
+      const y = ev.clientY;
+      const rows = ref.current ? Array.from(ref.current.querySelectorAll("[data-rid]")) : [];
+      let overId = null;
+      for (const r of rows) { const b = r.getBoundingClientRect(); if (y >= b.top && y <= b.bottom) { overId = r.getAttribute("data-rid"); break; } }
+      if (overId && overId !== dragId) {
+        const order = itemsRef.current.map((i) => i.id);
+        const from = order.indexOf(dragId), to = order.indexOf(overId);
+        if (from > -1 && to > -1) { order.splice(to, 0, order.splice(from, 1)[0]); onReorder(order); }
+      }
+      ev.preventDefault();
+    };
+    const onUp = () => setDragId(null);
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp); };
+  }, [dragId]);
+  return (
+    <div ref={ref} className="reorder">
+      {items.map((it, i) => (
+        <div key={it.id} data-rid={it.id} className={`reorder-row ${dragId === it.id ? "dragging" : ""}`}>
+          <button className="draghandle" style={{ touchAction: "none" }} onPointerDown={() => setDragId(it.id)} aria-label="Drag to reorder"><GripVertical size={16} /></button>
+          <span className="ord mono">{i + 1}</span>
+          <div className="grow" style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{it.name}</div>
+            {it.sub && <div className="mono" style={{ fontSize: 11, color: "var(--steel)", marginTop: 2 }}>{it.sub}</div>}
+          </div>
+          {onRemove && <button className="iconbtn" onClick={() => onRemove(it.id)}><X size={15} /></button>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RoutineEditor({ routine, exercises, onSave, onClose }) {
   const [name, setName] = useState(routine.name || "");
   const [color, setColor] = useState(routine.color || "#DE3417");
@@ -2066,6 +2172,15 @@ function RoutineEditor({ routine, exercises, onSave, onClose }) {
             <span>Exercises · {ids.length} selected</span>
             {ids.length > 0 && <button onClick={() => setIds([])} style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700 }}>Clear all</button>}
           </label>
+          {ids.length > 0 && (
+            <>
+              <ReorderList
+                items={ids.map((id) => { const e = exercises.find((x) => x.id === id); return { id, name: e ? e.name : id, sub: e ? (e.primary || []).map((m) => muscleById[m]?.name).filter(Boolean).join(", ") : "" }; })}
+                onReorder={(order) => setIds(order)}
+                onRemove={(id) => toggle(id)} />
+              <p className="muted" style={{ fontSize: 11, margin: "2px 2px 12px" }}>Drag the handle to reorder. This is the order they'll appear in your workout.</p>
+            </>
+          )}
           <div style={{ position: "relative", marginBottom: 10 }}>
             <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)" }} />
             <input className="tin" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search library" />
@@ -2121,6 +2236,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   const [confirm, setConfirm] = useState(false);
   const [adding, setAdding] = useState(false);
   const [wType, setWType] = useState(null);
+  const [collapse, setCollapse] = useState({}); // exerciseId -> bool override
   const [hrPhoto, setHrPhoto] = useState(null);
   const [hrBusy, setHrBusy] = useState(false);
   const hrRef = useRef(null);
@@ -2167,6 +2283,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
       ...e, sets: e.sets.map((s) => { if (s.id === setId) { wasDone = s.done; s0 = s; return { ...s, done: !s.done }; } return s; }),
     });
     saveActive({ ...active, entries });
+    setCollapse((c) => { const n = { ...c }; delete n[en.exerciseId]; return n; });
     if (!wasDone && !isComplete(ex, s0)) startRest(restDefault);
   };
   const addSet = (entryIdx) => {
@@ -2189,7 +2306,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     saveActive({ ...active, entries });
   };
   const removeExercise = (entryIdx) => saveActive({ ...active, entries: active.entries.filter((_, i) => i !== entryIdx) });
-  const addExercise = (id) => { const ex = exById[id]; saveActive({ ...active, entries: [...active.entries, { exerciseId: id, sets: makeSets(ex, suggestWeight(ex, lastFor(id), unit)) }] }); setAdding(false); };
+  const addExercise = (id) => { const ex = exById[id]; saveActive({ ...active, entries: [...active.entries, { exerciseId: id, sets: makeSets(ex, lastFor(id), unit) }] }); setAdding(false); };
 
   const lastFor = (exId) => {
     for (const s of sessions) { const e = s.entries.find((x) => x.exerciseId === exId); if (e) return e; }
@@ -2223,14 +2340,36 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
         const ex = exById[en.exerciseId]; if (!ex) return null;
         const fields = TRACKING[ex.trackingType].fields;
         const last = lastFor(en.exerciseId);
-        const cols = `28px ${fields.map(() => "1fr").join(" ")} 40px`;
+        const cols = `28px ${fields.map(() => "1fr").join(" ")} 40px 30px`;
         const lastTxt = last ? last.sets.map((s) => {
           if (s.weight) return `${s.weight}×${s.reps}`;
           if (s.timeSec) return fmtTime(s.timeSec);
           if (s.distance) return `${s.distance}${dist}`;
           return `${s.reps}`;
         }).join("  ") : null;
-        return (
+        return (() => {
+          const allDone = en.sets.length > 0 && en.sets.every((s) => s.done);
+          const isCollapsed = collapse[en.exerciseId] !== undefined ? collapse[en.exerciseId] : allDone;
+          const doneCount = en.sets.filter((s) => s.done).length;
+          const setsTxt = en.sets.map((s) => {
+            if (num(s.weight) > 0 && num(s.reps) > 0) return `${s.weight}×${s.reps}`;
+            if (s.time) return s.time;
+            if (s.distance) return `${s.distance}${dist}`;
+            if (num(s.reps) > 0) return `${s.reps}`;
+            return null;
+          }).filter(Boolean).join("  ");
+          if (isCollapsed) return (
+            <button className={`exblock excollapsed ${allDone ? "alldone" : ""}`} key={ei}
+              onClick={() => setCollapse((c) => ({ ...c, [en.exerciseId]: false }))}>
+              <span className={`donedot ${allDone ? "on" : ""}`}><Check size={13} /></span>
+              <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                <span className="en" style={{ fontSize: 15.5, display: "block" }}>{ex.name}</span>
+                <span className="mono colmeta">{doneCount}/{en.sets.length} sets{setsTxt ? ` · ${setsTxt}` : ""}</span>
+              </span>
+              <ChevronRight size={17} style={{ color: "var(--steel)", transform: "rotate(90deg)", flex: "none" }} />
+            </button>
+          );
+          return (
           <div className="exblock" key={ei}>
             <div className="exhead">
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -2239,6 +2378,11 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                   <div style={{ marginTop: 7 }}><MuscleTags ids={ex.primary} /></div>
                   {lastTxt && <div className="last">Last: {lastTxt}</div>}
                 </div>
+                {allDone && (
+                  <button className="iconbtn" title="Collapse" onClick={() => setCollapse((c) => ({ ...c, [en.exerciseId]: true }))}>
+                    <ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} />
+                  </button>
+                )}
                 <button className="iconbtn" onClick={() => removeExercise(ei)}><Trash2 size={15} /></button>
               </div>
             </div>
@@ -2246,6 +2390,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
               <div className="setlabels" style={{ gridTemplateColumns: cols }}>
                 <span></span>
                 {fields.map((f) => <span key={f} style={{ textAlign: "center" }}>{f === "weight" ? unit : f === "distance" ? dist : f === "time" ? "m:ss" : f}</span>)}
+                <span></span>
                 <span></span>
               </div>
               {(() => {
@@ -2261,11 +2406,12 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                         <span className="setno">{label}</span>
                         {fields.map((f) => (
                           <input key={f} className="inp" inputMode={f === "time" ? "text" : "decimal"}
-                            value={s[f]} placeholder={f === "reps" && !s.warmup && s.target ? s.target : f === "time" ? "0:00" : "0"}
+                            value={s[f]} placeholder={f === "weight" && s.phw ? s.phw : f === "reps" ? (s.phr || (!s.warmup && s.target) || "0") : f === "time" ? "0:00" : "0"}
                             onChange={(e) => update(ei, s.id, f, e.target.value)}
                             onDoubleClick={() => removeSet(ei, s.id)} />
                         ))}
                         <button className={`ck ${s.done ? "on" : ""}`} onClick={() => toggleDone(ei, s.id)}><Check size={18} /></button>
+                        <button className="setdel" aria-label="Delete set" onClick={() => removeSet(ei, s.id)}><X size={15} /></button>
                       </div>
                     ))}
                     {ex.category !== "cardio" ? (
@@ -2280,7 +2426,8 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
               })()}
             </div>
           </div>
-        );
+          );
+        })();
       })}
 
       <button className="btn ghost" onClick={() => setAdding(true)}><Plus size={16} /> Add exercise</button>
