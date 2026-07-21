@@ -176,6 +176,12 @@ const CSS = `
 .gt .excollapsed .donedot{ width:24px; height:24px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:var(--surface2); color:var(--steel); flex:none; }
 .gt .excollapsed .donedot.on{ background:var(--good); color:#fff; }
 .gt .excollapsed .colmeta{ display:block; font-size:10.5px; color:var(--steel); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gt .archbadge.on{ background:var(--good); color:#fff; border-color:transparent; }
+.gt .v2notes{ margin-top:10px; border-top:1px dashed var(--line); padding-top:8px; }
+.gt .vnrow{ font-size:10.5px; color:var(--ink2); padding:2px 0; }
+.gt .vnrow.warn{ color:#B8791E; }
+.gt .vnrow.warn2{ color:var(--accent); font-weight:700; }
+.gt .vnrow.dim{ color:var(--steel); font-size:10px; margin-top:4px; }
 .gt .progresshint{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--good); font-weight:700; margin-top:9px; padding:8px 10px; background:#EAF6EE; border-radius:9px; }
 .gt .reorder{ margin-bottom:8px; }
 .gt .reorder-row{ display:flex; align-items:center; gap:8px; padding:9px 10px; margin-bottom:6px; border:1px solid var(--line); border-radius:11px; background:var(--surface); }
@@ -224,7 +230,7 @@ const CSS = `
 .gt .sheeth .tt{ font-family:'Archivo',sans-serif; font-weight:900; font-size:20px; text-transform:uppercase; letter-spacing:-.01em; }
 .gt .sheetfoot{ position:sticky; bottom:0; background:var(--concrete); padding:12px 0 6px; margin-top:6px; box-shadow:0 -8px 16px -8px rgba(0,0,0,.12); }
 .gt .pkghead{ display:flex; align-items:center; gap:10px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
-.gt{ --balance-over:#DE3417; --balance-balanced:#2FA25A; --balance-under:#2E6BE6; --balance-neutral:transparent; }
+.gt{ --balance-over:#DE3417; --balance-balanced:#2FA25A; --balance-under:#2E6BE6; --balance-mixed:#E8A13C; --balance-neutral:transparent; }
 .gt .muscle-path{ transition:fill 220ms ease, fill-opacity 220ms ease, filter 220ms ease; cursor:pointer; pointer-events:auto; outline:none; }
 .gt .muscle-path:hover{ filter:brightness(1.12) saturate(1.1); fill-opacity:0.8 !important; }
 .gt .muscle-path:focus-visible{ stroke:#111; stroke-width:1.3; }
@@ -492,7 +498,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v29";
+const APP_VERSION = "v36";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -816,6 +822,22 @@ const SPLIT2_EXERCISES = (() => {
   ];
 })();
 
+// Joint-safe upper/lower additions (injury-adapted 4-day). Library only.
+const UL_EXERCISES = (() => {
+  const X = (name, primary, secondary = [], trackingType = "weight_reps", category = "weight") =>
+    ({ id: "x_" + slug(name), name, category, trackingType, primary, secondary });
+  return [
+    X("Neutral Grip Dumbbell Bench Press", ["chest"], ["triceps", "shoulders"]),
+    X("Neutral Grip Chest Supported T-Bar Row", ["lats", "upper_back"], ["biceps"]),
+    X("Cable Fly", ["chest"], ["shoulders"]),
+    X("Barbell Romanian Deadlift (straps)", ["hamstrings", "glutes"]),
+    X("Captains Chair Knee Raise", ["core"], [], "reps"),
+    X("Single Arm Cable Row", ["lats", "upper_back"], ["biceps"]),
+    X("Rope Hammer Curl", ["biceps"], ["forearms"]),
+    X("Cable Pull-Through", ["glutes"], ["hamstrings"]),
+  ];
+})();
+
 /* ---------------- storage ---------------- */
 const store = {
   async get(key, fb) {
@@ -896,6 +918,7 @@ export default function App() {
   const [unit, setUnit] = useState("kg");
   const [dist, setDist] = useState("km");
   const [restDefault, setRestDefault] = useState(90);
+  const [activeProgramId, setActiveProgramId] = useState(null); // null = score all non-archived
   const [rest, setRest] = useState(null); // {total, left, running}
 
   const exById = useMemo(() => Object.fromEntries(exercises.map((e) => [e.id, e])), [exercises]);
@@ -919,6 +942,7 @@ export default function App() {
       applyPack("common-2", COMMON_EXERCISES);
       applyPack("common-3", COMMON_EXERCISES_3);
       applyPack("andy-split-2", SPLIT2_EXERCISES);
+      applyPack("andy-ul-1", UL_EXERCISES);
       // ensure every exercise has sub-muscle tags (covers newly added packs too)
       ex = ex.map((e) => (e.subMuscles && e.subMuscles.length) ? e : { ...e, subMuscles: inferSubMuscles(e) });
       if (!packs.includes("submuscle-1")) packs = [...packs, "submuscle-1"];
@@ -961,6 +985,61 @@ export default function App() {
         store.set("routines", rt);
         packs = [...packs, "routines-andy-3"];
       }
+      if (!packs.includes("routines-andy-4")) {
+        const byName = {};
+        ex.forEach((e) => { byName[e.name.trim().toLowerCase()] = e.id; });
+        const N = (n) => byName[n.toLowerCase()];
+        const ULSPEC = [
+          { name: "Upper A — Chest & Back", color: "#2E6BE6", ex: [
+            ["Incline Machine Press", 3], ["Neutral Grip Lat Pulldown", 3], ["Neutral Grip Dumbbell Bench Press", 3],
+            ["Neutral Grip Chest Supported T-Bar Row", 3], ["Cable Fly", 2], ["Cable Lateral Raise", 4],
+            ["Cable Rope Tricep Pressdown", 2], ["Cable Crunch", 3]] },
+          { name: "Lower A — Quad Focus", color: "#12A5A0", ex: [
+            ["Hack Squat", 3], ["Barbell Romanian Deadlift (straps)", 3], ["Machine Leg Press", 3],
+            ["Machine Seated Leg Curl", 3], ["Machine Leg Extension", 2], ["Standing Calf Raise", 4],
+            ["Captains Chair Knee Raise", 3]] },
+          { name: "Upper B — Back, Delts & Arms", color: "#F2A81E", ex: [
+            ["Chest Supported Machine Row", 3], ["Machine Shoulder Press", 2], ["Single Arm Cable Row", 3],
+            ["Seated Chest Press Machine", 3], ["Seated Machine Lateral Raise", 4], ["Machine Reverse Fly", 3],
+            ["Rope Hammer Curl", 3], ["Single Arm Cross-Body Cable Tricep Extension", 2]] },
+          { name: "Lower B — Posterior Chain", color: "#159C86", ex: [
+            ["Barbell Hip Thrust", 3], ["Bulgarian Split Squat", 3], ["Machine Lying Leg Curl", 3],
+            ["Machine Leg Extension", 3], ["Cable Pull-Through", 2], ["Seated Calf Raise", 3], ["Pallof Press", 3]] },
+        ];
+        const ulProgId = uid();
+        const newRts = ULSPEC.map((spec) => {
+          const ids = spec.ex.map(([n]) => N(n)).filter(Boolean);
+          const so = {};
+          spec.ex.forEach(([n, w]) => { const id = N(n); if (id) so[id] = w; });
+          return { id: uid(), name: spec.name, color: spec.color, programId: ulProgId, exerciseIds: ids, setOverrides: so };
+        });
+        rt = [...rt, ...newRts];
+        const progs = await store.get("programs", []);
+        store.set("programs", [...progs, { id: ulProgId, name: "Upper / Lower — Joint-Safe", color: "#2E6BE6", createdAt: Date.now() }]);
+        store.set("routines", rt);
+        packs = [...packs, "routines-andy-4"];
+      }
+      if (!packs.includes("routines-andy-5")) {
+        const byName = {};
+        ex.forEach((e) => { byName[e.name.trim().toLowerCase()] = e.id; });
+        const N = (n) => byName[n.toLowerCase()];
+        // [name, workingSets, warmups] — hybrid: heavy 2-set openers, 90s-rest isolations
+        const HSPEC = {
+          "upper a — chest & back": [["Incline Machine Press", 2, 2], ["Neutral Grip Lat Pulldown", 3, 1], ["Neutral Grip Dumbbell Bench Press", 2, 1], ["Neutral Grip Chest Supported T-Bar Row", 3, 1], ["Cable Fly", 2, 0], ["Cable Lateral Raise", 3, 1], ["Cable Rope Tricep Pressdown", 2, 0]],
+          "lower a — quad focus": [["Hack Squat", 2, 2], ["Barbell Romanian Deadlift (straps)", 3, 1], ["Machine Leg Press", 3, 1], ["Machine Seated Leg Curl", 3, 1], ["Machine Leg Extension", 3, 1], ["Standing Calf Raise", 3, 1]],
+          "upper b — back, delts & arms": [["Chest Supported Machine Row", 3, 2], ["Single Arm Cable Row", 2, 0], ["Seated Chest Press Machine", 3, 1], ["Seated Machine Lateral Raise", 4, 1], ["Machine Reverse Fly", 3, 1], ["Rope Hammer Curl", 3, 1]],
+          "lower b — posterior chain": [["Barbell Hip Thrust", 2, 2], ["Bulgarian Split Squat", 2, 1], ["Machine Lying Leg Curl", 3, 1], ["Machine Leg Extension", 3, 1], ["Cable Crunch", 4, 0], ["Seated Calf Raise", 3, 0], ["Cable Rope Tricep Pressdown", 2, 0]],
+        };
+        rt = rt.map((r) => {
+          const spec = HSPEC[r.name.trim().toLowerCase()];
+          if (!spec) return r;
+          const ids = []; const so = {}; const wo = {};
+          spec.forEach(([n, w, wu]) => { const id = N(n); if (id) { ids.push(id); so[id] = w; wo[id] = wu; } });
+          return { ...r, exerciseIds: ids, setOverrides: so, wuOverrides: wo };
+        });
+        store.set("routines", rt);
+        packs = [...packs, "routines-andy-5"];
+      }
       store.set("exercises", ex);
       store.set("packs", packs);
       setEx(ex); setRt(rt);
@@ -968,7 +1047,7 @@ export default function App() {
       setSess(await store.get("sessions", []));
       setActive(await store.get("activeSession", null));
       const s = await store.get("settings", {});
-      if (s.unit) setUnit(s.unit); if (s.dist) setDist(s.dist); if (s.restDefault) setRestDefault(s.restDefault);
+      if (s.unit) setUnit(s.unit); if (s.dist) setDist(s.dist); if (s.restDefault) setRestDefault(s.restDefault); if (s.activeProgramId !== undefined) setActiveProgramId(s.activeProgramId);
       setLoading(false);
     })();
   }, []);
@@ -979,7 +1058,7 @@ export default function App() {
   const saveProg = (n) => { setPrograms(n); store.set("programs", n); };
   const saveSess = (n) => { setSess(n); store.set("sessions", n); };
   const saveActive = (n) => { setActive(n); store.set("activeSession", n); };
-  useEffect(() => { if (!loading) store.set("settings", { unit, dist, restDefault }); }, [unit, dist, restDefault, loading]);
+  useEffect(() => { if (!loading) store.set("settings", { unit, dist, restDefault, activeProgramId }); }, [unit, dist, restDefault, activeProgramId, loading]);
 
   // rest timer engine
   useEffect(() => {
@@ -1028,7 +1107,7 @@ export default function App() {
         const ex = exById[id];
         const lastSess = sessions.find((s) => s.entries && s.entries.some((en) => en.exerciseId === id));
         const lastEntry = lastSess ? lastSess.entries.find((en) => en.exerciseId === id) : null;
-        return { exerciseId: id, sets: makeSets(ex, lastEntry, unit) };
+        return { exerciseId: id, sets: makeSets(ex, lastEntry, unit, routine.setOverrides && routine.setOverrides[id], routine.wuOverrides ? routine.wuOverrides[id] : undefined) };
       });
     saveActive({ id: uid(), routineId: routine.id, routineName: routine.name, color: routine.color, plannedMin: routine.plannedMin, startedAt: Date.now(), entries });
     setTab("workout");
@@ -1083,10 +1162,10 @@ export default function App() {
       <style>{CSS}</style>
       <div className="wrap">
         {tab === "home" && (
-          <Dashboard {...{ sessions, exercises, routines, exById, active, unit, dist, setUnit, setDist, setTab, backup }} />
+          <Dashboard {...{ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId }} />
         )}
         {tab === "routines" && (
-          <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault }} />
+          <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault, activeProgramId, setActiveProgramId }} />
         )}
         {tab === "workout" && (
           <Workout {...{ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab }} />
@@ -1166,17 +1245,19 @@ function liftDefaults(ex) {
   return isCompound(ex) ? { warmups: 2, work: 2, lo: 6, hi: 10 } : { warmups: 1, work: 3, lo: 10, hi: 15 };
 }
 function incFor(ex, unit) { const c = isCompound(ex); return unit === "lb" ? (c ? 5 : 2.5) : (c ? 2.5 : 1.25); }
-function makeSets(ex, lastEntry, unit) {
+function makeSets(ex, lastEntry, unit, workCount, wuCount) {
   if (!ex || ex.category === "cardio") return [newSet()];
   const d = liftDefaults(ex); const out = [];
   const lastW = lastEntry ? lastEntry.sets.filter((s) => s.warmup) : [];
   const lastS = lastEntry ? lastEntry.sets.filter((s) => !s.warmup) : [];
   const sugg = suggestWeight(ex, lastEntry, unit);
-  for (let i = 0; i < d.warmups; i++) {
+  const nWu = (wuCount == null ? d.warmups : wuCount);
+  for (let i = 0; i < nWu; i++) {
     const p = lastW[i];
     out.push(newSet({ warmup: true, phw: p && p.weight ? String(p.weight) : "", phr: p && p.reps ? String(p.reps) : "" }));
   }
-  for (let i = 0; i < d.work; i++) {
+  const nWork = workCount || d.work;
+  for (let i = 0; i < nWork; i++) {
     const p = lastS[i];
     out.push(newSet({
       target: `${d.lo}-${d.hi}`,
@@ -1261,7 +1342,7 @@ function MuscleTags({ ids, half }) {
 /* ============================================================
    DASHBOARD
    ============================================================ */
-function Dashboard({ sessions, exercises, routines, exById, active, unit, dist, setUnit, setDist, setTab, backup }) {
+function Dashboard({ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId }) {
   const [loadMode, setLoadMode] = useState("sets"); // sets | volume
   const [openGroup, setOpenGroup] = useState(null);
   const [bmMetric, setBmMetric] = useState("sets");
@@ -1417,12 +1498,24 @@ function Dashboard({ sessions, exercises, routines, exById, active, unit, dist, 
             </div>
           </div>
         )}
-        <BodyMap items={(() => {
+        {(() => { const v2data = (() => {
+          if (bmSource === "planned") {
+            const archived = new Set((programs || []).filter((p) => p.archived).map((p) => p.id));
+            const hasActive = activeProgramId && (programs || []).some((p) => p.id === activeProgramId);
+            const scoped = hasActive ? routines.filter((r) => r.programId === activeProgramId) : routines.filter((r) => !archived.has(r.programId));
+            const sess = scoped.map((r) => (r.exerciseIds || []).map((id) => { const ex = exById[id]; return ex && ex.category !== "cardio" ? { ex, sets: (r.setOverrides && r.setOverrides[id]) || liftDefaults(ex).work } : null; }).filter(Boolean));
+            return computeV2(sess, 1);
+          }
+          if (bmMetric !== "sets") return null;
+          const sess = sessions.filter((s) => within(s.date, bmDays)).map((s) => (s.entries || []).map((en) => { const ex = exById[en.exerciseId] || { name: en.name, category: en.category, primary: en.primary, secondary: en.secondary }; const nn = (en.sets || []).filter((st) => !st.warmup).length; return ex.category !== "cardio" && nn ? { ex, sets: nn } : null; }).filter(Boolean));
+          return computeV2(sess, bmDays / 7);
+        })(); return (<>
+        <BodyMap v2={v2data} items={(() => {
           if (bmSource === "planned") {
             const seen = new Set(); const out = [];
             routines.forEach((r) => (r.exerciseIds || []).forEach((id) => {
               const ex = exById[id]; if (!ex || ex.category === "cardio") return;
-              out.push({ name: ex.name, primary: ex.primary, secondary: ex.secondary, subMuscles: ex.subMuscles || [], weight: 1 });
+              out.push({ name: ex.name, primary: ex.primary, secondary: ex.secondary, subMuscles: ex.subMuscles || [], weight: liftDefaults(ex).work });
             }));
             return out;
           }
@@ -1437,6 +1530,16 @@ function Dashboard({ sessions, exercises, routines, exById, active, unit, dist, 
           }));
           return Object.values(map);
         })()} />
+        {v2data && (
+          <div className="v2notes">
+            {bmSource === "planned" && <div className="vnrow mono">Scoring: {(activeProgramId && (programs || []).find((p) => p.id === activeProgramId)?.name) || "all routines (none active)"}</div>}
+            <div className="vnrow mono">Delts — front {(v2data.weekly.delt_front || 0).toFixed(1)} · side {(v2data.weekly.delt_side || 0).toFixed(1)} · rear {(v2data.weekly.delt_rear || 0).toFixed(1)} est. sets · {v2data.shoulder.toLowerCase()}</div>
+            {v2data.conc.map((m) => <div key={m} className="vnrow warn">High session concentration: {RAIL_LABELS[m] || m} over 10 routed sets in one session.</div>)}
+            {v2data.div.map(([k, c]) => <div key={k} className={"vnrow " + (c >= 4 ? "warn2" : "warn")}>{c} exercises share the {k.replace(/-/g, " ")} pattern this week — {c >= 4 ? "strong redundancy" : "possible redundancy"}.</div>)}
+            <div className="vnrow dim">Estimated effective sets: weekly hypertrophy stimulus from exercise involvement, effort and session distribution. Individual response may differ.</div>
+          </div>
+        )}
+        </>); })()}
         <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>{bmSource === "planned"
           ? "Total planned load across all your routines — the balance of your whole program."
           : `Your logged ${bmMetric === "volume" ? "volume" : "sets"} over ${bmDays} days, with primary/secondary weighting.`}</p>
@@ -1717,8 +1820,10 @@ function estimateMin(routine, exById, restSec = 90) {
     const ex = exById[id]; if (!ex) return;
     if (ex.category === "cardio") { sec += 10 * 60; return; }
     const d = liftDefaults(ex);
-    sec += d.warmups * (30 + Math.min(60, restSec * 0.6));
-    sec += d.work * (40 + restSec);
+    const nw = (routine.setOverrides && routine.setOverrides[id]) || d.work;
+    const wu = (routine.wuOverrides && routine.wuOverrides[id] != null) ? routine.wuOverrides[id] : d.warmups;
+    sec += wu * (30 + Math.min(60, restSec * 0.6));
+    sec += nw * (40 + restSec);
     sec += 75; // setup / transition
   });
   return Math.max(5, Math.round(sec / 60 / 5) * 5);
@@ -1767,7 +1872,7 @@ function copyToClipboard(text) {
   try { const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); } catch (e) {}
 }
 
-function Routines({ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault }) {
+function Routines({ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault, activeProgramId, setActiveProgramId }) {
   const [editing, setEditing] = useState(null);
   const [editingProg, setEditingProg] = useState(null);
   const [openProg, setOpenProg] = useState(null);
@@ -1838,7 +1943,7 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
           <span style={{ width: 5, background: color, flex: "none" }} />
           <button style={{ flex: 1, textAlign: "left", background: "none", padding: "14px 4px 14px 12px", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }} onClick={() => toggle(id)}>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span className="pkgname" style={{ display: "block" }}>{name}{badge && <span className="archbadge">{badge}</span>}</span>
+              <span className="pkgname" style={{ display: "block" }}>{name}{badge && <span className={"archbadge" + (badge === "Active" ? " on" : "")}>{badge}</span>}</span>
               <span className="pkgmeta mono" style={{ display: "block" }}>{meta}</span>
             </span>
             <ChevronRight size={18} style={{ color: "var(--steel)", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", flex: "none" }} />
@@ -1885,7 +1990,7 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
         return (
           <Accordion key={p.id} id={p.id} color={p.color} name={p.name} meta={meta} items={items} onAddProgramId={p.id}
             onCopyAll={() => copyExport(buildRoutineExport(p, routines, exById, sessions, dist, restDefault))}
-            badge={p.archived ? "Archived" : null}
+            badge={p.id === activeProgramId ? "Active" : p.archived ? "Archived" : null}
             actions={<button className="iconbtn" style={{ border: "none", background: "none", alignSelf: "center", marginRight: 4 }} onClick={() => setOpenProg(p)} title="Details & history"><Activity size={16} /></button>} />
         );
       })}
@@ -1911,6 +2016,8 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
       )}
       {openProg && (
         <ProgramSheet program={openProg} routines={routines} sessions={sessions} exById={exById}
+          isActive={openProg.id === activeProgramId}
+          onSetActive={() => { const on = openProg.id !== activeProgramId; setActiveProgramId(on ? openProg.id : null); flash(on ? "Active routine: " + openProg.name : "No active routine — scoring all"); }}
           onCopy={() => copyExport(buildRoutineExport(openProg, routines, exById, sessions, dist, restDefault))}
           onEdit={() => { setEditingProg(openProg); setOpenProg(null); }}
           onArchive={() => archiveProgram(openProg.id, !openProg.archived)}
@@ -2014,7 +2121,7 @@ function ProgramEditor({ program, routines, onSave, onClose }) {
   );
 }
 
-function ProgramSheet({ program, routines, sessions, exById, onEdit, onArchive, onDelete, onStart, onCopy, onClose }) {
+function ProgramSheet({ program, routines, sessions, exById, isActive, onSetActive, onEdit, onArchive, onDelete, onStart, onCopy, onClose }) {
   const rs = routines.filter((r) => r.programId === program.id);
   const rids = new Set(rs.map((r) => r.id));
   const hist = sessions.filter((s) => rids.has(s.routineId)).sort((a, b) => b.date - a.date);
@@ -2061,7 +2168,10 @@ function ProgramSheet({ program, routines, sessions, exById, onEdit, onArchive, 
           }) : <div className="empty" style={{ padding: "14px 0" }}><p>No workouts recorded under this package yet.</p></div>}
         </div>
 
-        <button className="btn dark" style={{ marginTop: 4 }} onClick={onCopy}><Copy size={15} /> Copy routine for AI analysis</button>
+        <button className={"btn " + (isActive ? "acc" : "ghost")} style={{ marginTop: 4 }} onClick={onSetActive}>
+          <CheckCircle2 size={15} /> {isActive ? "Active routine — tap to deactivate" : "Set as active routine"}
+        </button>
+        <button className="btn dark" style={{ marginTop: 8 }} onClick={onCopy}><Copy size={15} /> Copy routine for AI analysis</button>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <button className="btn ghost" onClick={onEdit}><Pencil size={15} /> Edit routine</button>
           <button className="btn ghost" onClick={onArchive}><Database size={15} /> {program.archived ? "Unarchive" : "Archive"}</button>
@@ -3043,6 +3153,159 @@ const GROUP_REGIONS = {
   calves: ["calves"],
 };
 
+/* ================= V2 volume model (final spec) =================
+   Estimated effective sets = routingWeight x quality x sessionFatigue,
+   working sets only, compared to fixed population rails. Diversity and
+   session concentration are separate warnings, never multipliers.
+   Quality inputs default 1.0 (no RIR UI yet); adaptive personalised
+   targets are a documented later phase — traffic lights are rail-based
+   per spec section 3. Manual subtypes (row bias, dip type, face-pull
+   variant, lunge bias, squat depth) use name-based defaults for now. */
+const RAILS = {
+  chest: [8, 18], lats: [8, 18], upper_back: [8, 18],
+  delt_front: [0, 10], delt_side: [6, 18], delt_rear: [4, 16],
+  biceps: [6, 16], triceps: [6, 16], forearms: [2, 10],
+  quads: [8, 16], hamstrings: [6, 14], glutes: [4, 14],
+  calves: [6, 16], core: [4, 12],
+};
+const RAIL_LABELS = { chest: "Chest", lats: "Lats", upper_back: "Upper back", delt_front: "Front delt", delt_side: "Side delt", delt_rear: "Rear delt", biceps: "Biceps", triceps: "Triceps", forearms: "Forearms", quads: "Quads", hamstrings: "Hamstrings", glutes: "Glutes", calves: "Calves", core: "Abs / core" };
+// visible map group -> rail key (shoulders handled per-head)
+const V2_GROUP_KEY = { chest: "chest", biceps: "biceps", triceps: "triceps", forearms: "forearms", abs: "core", obliques: "core", traps: "upper_back", lats: "lats", quads: "quads", tibialis: "calves", glutes: "glutes", hamstrings: "hamstrings", calves: "calves" };
+
+// Exercise -> [[railKey, weight], ...]. Name-based classifier with the old
+// primary/secondary model as fallback so every exercise routes somewhere.
+function v2Routing(ex) {
+  const n = (ex.name || "").toLowerCase();
+  const straps = n.includes("strap");
+  const has = (...ws) => ws.some((w) => n.includes(w));
+  const F = (rows) => rows.filter((r) => r[1] > 0);
+  if (has("lateral raise")) return [["delt_side", 1], ["upper_back", 0.25]];
+  if (has("front raise")) return [["delt_front", 1]];
+  if (has("face pull")) return [["delt_rear", 1], ["upper_back", 0.5]];
+  if (has("rear delt", "reverse fly", "reverse pec")) return [["delt_rear", 1], ["upper_back", 0.25]];
+  if (has("shrug")) return [["upper_back", 1]];
+  if (has("upright row")) return [["upper_back", 0.75], ["delt_side", 0.5]];
+  if (has("arnold")) return [["delt_front", 1], ["delt_side", 0.5], ["triceps", 0.5]];
+  if (has("shoulder press", "overhead press", "military", "push press", "z press", "behind the neck")) return [["delt_front", 1], ["delt_side", 0.25], ["triceps", 0.5]];
+  if (has("pec deck")) return [["chest", 1]];
+  if (has("fly", "crossover")) return [["chest", 1], ["delt_front", 0.25]];
+  if (has("dip")) return has("bench dip") ? [["chest", 0.75], ["triceps", 0.75], ["delt_front", 0.25]] : [["chest", 1], ["triceps", 0.5], ["delt_front", 0.25]];
+  if (has("pullover")) return [["chest", 0.5], ["lats", 0.5]];
+  if (has("incline") && has("press", "push-up", "push up")) return [["chest", 1], ["delt_front", 0.5], ["triceps", 0.5]];
+  if (has("decline") && has("press")) return [["chest", 1], ["triceps", 0.5], ["delt_front", 0.25]];
+  if (has("bench press", "chest press", "floor press", "push-up", "push up", "landmine press", "svend")) return [["chest", 1], ["triceps", 0.5], ["delt_front", 0.5]];
+  if (has("chin-up", "chin up", "chinup")) return F([["lats", 1], ["biceps", 0.75], ["upper_back", 0.25], ["forearms", straps ? 0 : 0.25]]);
+  if (has("pulldown", "pull-up", "pull up", "pullup")) return F([["lats", 1], ["biceps", 0.5], ["upper_back", 0.25], ["forearms", straps ? 0 : 0.25]]);
+  if (has("straight arm")) return [["lats", 1]];
+  if (has("row") && !has("upright")) {
+    const latBias = has("single arm", "one arm", "close grip", "neutral grip", "kroc", "meadows", "cable row") && !has("wide");
+    const base = latBias ? [["lats", 1], ["upper_back", 0.5]] : [["upper_back", 1], ["lats", 0.5]];
+    return F([...base, ["biceps", 0.5], ["delt_rear", 0.25], ["forearms", straps ? 0 : 0.25]]);
+  }
+  if (has("rack pull")) return F([["upper_back", 0.75], ["hamstrings", 0.5], ["glutes", 0.5], ["forearms", straps ? 0 : 0.25]]);
+  if (has("romanian", "rdl", "stiff leg", "stiff-leg", "good morning")) return F([["hamstrings", 1], ["glutes", 0.5], ["forearms", straps ? 0 : 0.25]]);
+  if (has("hip thrust", "glute bridge", "frog pump")) return [["glutes", 1], ["quads", 0.25], ["hamstrings", 0.25]];
+  if (has("deadlift")) return F([["hamstrings", 1], ["glutes", 0.5], ["upper_back", 0.25], ["forearms", straps ? 0 : 0.25]]);
+  if (has("abduction")) return [["glutes", 1]];
+  if (has("kickback") && (ex.primary || []).includes("glutes")) return [["glutes", 1]];
+  if (has("leg extension", "sissy")) return [["quads", 1]];
+  if (has("lunge", "split squat", "step-up", "step up")) return [["quads", 1], ["glutes", 0.5]];
+  if (has("squat", "leg press")) return [["quads", 1], ["glutes", 0.5]];
+  if (has("nordic", "glute ham")) return [["hamstrings", 1]];
+  if (has("leg curl")) return [["hamstrings", 1]];
+  if (has("calf")) return [["calves", 1]];
+  if (has("reverse curl", "reverse wrist")) return has("wrist") ? [["forearms", 1]] : [["forearms", 0.75], ["biceps", 0.25]];
+  if (has("wrist curl", "pinch", "farmer")) return [["forearms", 1]];
+  if (has("hammer curl", "zottman")) return [["biceps", 1], ["forearms", 0.5]];
+  if (has("curl")) return [["biceps", 1], ["forearms", 0.25]];
+  if (has("pushdown", "pressdown", "skull", "tricep", "triceps", "kickback", "jm press", "tate")) return [["triceps", 1]];
+  if ((ex.primary || []).includes("core") || has("crunch", "plank", "sit-up", "situp", "rollout", "leg raise", "knee raise", "twist", "pallof", "toes to bar", "dragon", "ab wheel")) return [["core", 1]];
+  // fallback: legacy primary 1.0 / secondary 0.5 (shoulders split front/side)
+  const out = [];
+  const push = (m, w) => {
+    if (m === "shoulders") { out.push(["delt_front", w * 0.5], ["delt_side", w * 0.5]); }
+    else if (RAILS[m]) out.push([m, w]);
+  };
+  (ex.primary || []).forEach((m) => push(m, 1));
+  (ex.secondary || []).forEach((m) => push(m, 0.5));
+  return out;
+}
+
+// Pattern taxonomy for diversity warnings (never a multiplier)
+function v2Pattern(ex) {
+  const n = (ex.name || "").toLowerCase();
+  const has = (...ws) => ws.some((w) => n.includes(w));
+  if (has("lateral raise")) return "lateral-raise";
+  if (has("face pull")) return "face-pull";
+  if (has("rear delt", "reverse fly", "reverse pec")) return "rear-delt-fly";
+  if (has("arnold", "shoulder press", "overhead press", "military", "push press", "z press", "behind the neck")) return "vertical-press";
+  if (has("pec deck", "fly", "crossover")) return "fly";
+  if (has("dip")) return "decline-dip";
+  if (has("incline") && has("press", "push")) return "incline-press";
+  if (has("decline") && has("press")) return "decline-dip";
+  if (has("bench press", "chest press", "floor press", "push-up", "push up")) return "horizontal-press";
+  if (has("chin-up", "chin up", "chinup", "pulldown", "pull-up", "pull up", "pullup")) return "vertical-pull";
+  if (has("row") && !has("upright")) return (has("single arm", "one arm", "close grip", "neutral grip", "kroc", "meadows", "cable row") && !has("wide")) ? "row-lat" : "row-upperback";
+  if (has("shrug", "upright row")) return "shrug";
+  if (has("romanian", "rdl", "stiff", "good morning", "deadlift", "rack pull")) return "hinge";
+  if (has("hip thrust", "glute bridge", "frog")) return "hip-thrust";
+  if (has("lunge", "split squat", "step")) return "lunge";
+  if (has("squat", "leg press")) return "squat";
+  if (has("leg extension", "sissy")) return "knee-ext";
+  if (has("seated leg curl")) return "kneeflex-seated";
+  if (has("leg curl")) return "kneeflex-lying";
+  if (has("nordic", "glute ham")) return "nordic";
+  if (has("seated calf")) return "calf-seated";
+  if (has("calf")) return "calf-standing";
+  if (has("wrist", "pinch", "farmer")) return "forearm";
+  if (has("reverse curl")) return "curl-pronated";
+  if (has("hammer", "zottman")) return "curl-neutral";
+  if (has("incline curl", "bayesian")) return "curl-extended";
+  if (has("preacher", "spider", "concentration")) return "curl-flexed";
+  if (has("curl")) return "curl-supinated";
+  if (has("overhead") && has("tricep", "extension")) return "tri-overhead";
+  if (has("cross-body", "cross body")) return "tri-crossbody";
+  if (has("pushdown", "pressdown")) return "tri-pressdown";
+  if (has("skull", "tricep", "tate", "jm")) return "tri-extension";
+  if (has("crunch", "sit-up", "situp")) return "ab-flexion";
+  return "misc-" + ((ex.primary || [])[0] || "x");
+}
+
+// sessionsList = array of sessions; each session = ordered [{ex, sets}]
+// weeks scales to a weekly figure (planned = 1; actual = days/7).
+function computeV2(sessionsList, weeks) {
+  const weekly = {}; const conc = new Set(); const patSlots = {};
+  sessionsList.forEach((exList) => {
+    const counters = {};
+    exList.forEach(({ ex, sets }) => {
+      if (!ex || ex.category === "cardio" || !sets) return;
+      const routes = v2Routing(ex);
+      const key = v2Pattern(ex);
+      patSlots[key] = (patSlots[key] || 0) + 1;
+      for (let i = 0; i < sets; i++) {
+        routes.forEach(([m, w]) => {
+          const pos = counters[m] || 0; // routed-set equivalents BEFORE this set
+          const f = pos < 5 ? 1 : pos < 8 ? 0.9 : pos < 12 ? 0.75 : 0.5;
+          weekly[m] = (weekly[m] || 0) + w * f;
+          counters[m] = pos + w;
+        });
+      }
+    });
+    Object.entries(counters).forEach(([m, c]) => { if (c > 10) conc.add(m); });
+  });
+  if (weeks && weeks !== 1) Object.keys(weekly).forEach((m) => { weekly[m] = weekly[m] / weeks; });
+  const status = {};
+  Object.entries(RAILS).forEach(([m, [lo, hi]]) => {
+    const v = weekly[m] || 0;
+    status[m] = v < lo ? "under" : v > hi ? "over" : "ok";
+  });
+  const hs = ["delt_front", "delt_side", "delt_rear"].map((h) => status[h]);
+  const shoulder = (hs.includes("over") && hs.includes("under")) ? "MIXED"
+    : hs.includes("over") ? "HIGH" : hs.includes("under") ? "LOW" : "BALANCED";
+  const div = Object.entries(patSlots).filter(([k, c]) => c >= 3 && k.indexOf("misc") !== 0);
+  return { weekly, status, shoulder, conc: Array.from(conc), div };
+}
+
 // One SVG path per visible region (left `d`; paired regions mirror about x=236 -> 472-x).
 const OVERLAYS = {
   front: [
@@ -3178,7 +3441,7 @@ function BodyView({ img, view, vb, overlays, colorForGroup, selected, onPick, de
   );
 }
 
-function BodyMap({ items }) {
+function BodyMap({ items, v2 }) {
   const [open, setOpen] = useState(null);
   const [mode, setMode] = useState("balance");
   const [debug, setDebug] = useState(false);
@@ -3194,7 +3457,19 @@ function BodyMap({ items }) {
   const gvals = Object.values(graw).filter((v) => v > 0);
   const gmean = gvals.length ? gvals.reduce((x, y) => x + y, 0) / gvals.length : 1;
   const colorForGroup = (g) => {
-    if (mode === "balance") { const c = balanceColor(graw[g] || 0, gmean); return c === BODY_BASE ? null : c; }
+    if (mode === "balance") {
+      if (v2) {
+        if (g === "shoulders") {
+          return v2.shoulder === "BALANCED" ? BAL.ok : v2.shoulder === "HIGH" ? BAL.over
+            : v2.shoulder === "LOW" ? BAL.under : "var(--balance-mixed)";
+        }
+        const key = V2_GROUP_KEY[g];
+        if (!key) return null;
+        const st = v2.status[key];
+        return st === "ok" ? BAL.ok : st === "over" ? BAL.over : BAL.under;
+      }
+      const c = balanceColor(graw[g] || 0, gmean); return c === BODY_BASE ? null : c;
+    }
     return getHeatColor(gheat[g] || 0);
   };
   const pick = (g) => { setSelected(g); setOpen(regionToMuscle[g]); };
@@ -3227,7 +3502,7 @@ function BodyMap({ items }) {
           <span className="mono" style={{ fontSize: 10, color: "var(--ink2)" }}>High</span>
         </div>
       )}
-      <p className="muted" style={{ fontSize: 11, marginTop: 8, textAlign: "center" }}>{debug ? "Tracer on — hover for path id + SVG coordinates." : "Tap a muscle for its heads and exercises."}</p>
+      <p className="muted" style={{ fontSize: 11, marginTop: 8, textAlign: "center" }}>{debug ? "Tracer on — hover for path id + SVG coordinates." : (v2 && mode === "balance") ? "Estimated effective sets vs weekly rails — green in range, blue under, red over, amber mixed delt heads. Tap for detail." : "Tap a muscle for its heads and exercises."}</p>
       {open && <MuscleZoom muscle={open} heat={heat} colorFor={fineColorFor} items={items} onClose={close} />}
     </>
   );
