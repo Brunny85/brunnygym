@@ -492,7 +492,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v28";
+const APP_VERSION = "v29";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -802,6 +802,20 @@ const COMMON_EXERCISES_3 = (() => {
   ];
 })();
 
+// Split v2 additions (July 2025 routine update). Library only.
+const SPLIT2_EXERCISES = (() => {
+  const X = (name, primary, secondary = [], trackingType = "weight_reps", category = "weight") =>
+    ({ id: "x_" + slug(name), name, category, trackingType, primary, secondary });
+  return [
+    X("Cable Rope Tricep Pressdown", ["triceps"]),
+    X("Decline Chest Press Machine", ["chest"], ["triceps", "shoulders"]),
+    X("EZ Bar Reverse Curl", ["forearms", "biceps"]),
+    X("Machine Lying Leg Curl", ["hamstrings"]),
+    X("Single Arm Cross-Body Cable Tricep Extension", ["triceps"]),
+    X("Barbell Row (use straps)", ["lats", "upper_back"], ["biceps"]),
+  ];
+})();
+
 /* ---------------- storage ---------------- */
 const store = {
   async get(key, fb) {
@@ -904,6 +918,7 @@ export default function App() {
       applyPack("andy-import-1", IMPORTED_EXERCISES);
       applyPack("common-2", COMMON_EXERCISES);
       applyPack("common-3", COMMON_EXERCISES_3);
+      applyPack("andy-split-2", SPLIT2_EXERCISES);
       // ensure every exercise has sub-muscle tags (covers newly added packs too)
       ex = ex.map((e) => (e.subMuscles && e.subMuscles.length) ? e : { ...e, subMuscles: inferSubMuscles(e) });
       if (!packs.includes("submuscle-1")) packs = [...packs, "submuscle-1"];
@@ -919,6 +934,32 @@ export default function App() {
         store.set("routines", rt);
         store.set("programs", [{ id: progId, name: "Only Split You Need", color: "#DE3417", createdAt: Date.now() }]);
         packs = [...packs, "routines-andy-2"];
+      }
+      if (!packs.includes("routines-andy-3")) {
+        const byName = {};
+        ex.forEach((e) => { byName[e.name.trim().toLowerCase()] = e.id; });
+        const twoSet = ["ez bar reverse curl", "dumbbell hammer curl", "high cable curl"];
+        ex = ex.map((e) => twoSet.includes(e.name.trim().toLowerCase()) ? { ...e, scheme: { warmups: 1, work: 2, lo: 10, hi: 15 } } : e);
+        const SPEC2 = [
+          { name: "Push", ex: ["Seated Dumbbell Lateral Raise", "Incline Barbell Press", "Machine Shoulder Press", "Seated Chest Press Machine", "High to Low Cable Fly", "Cable Rope Tricep Pressdown", "Decline Chest Press Machine", "Standing Calf Raise"] },
+          { name: "Pull", ex: ["Chest Supported Machine Row", "Straight Bar Lat Pulldown", "Wide Grip Cable Row", "Double Rear Delt Cable Fly", "EZ Bar Reverse Curl", "Dumbbell Hammer Curl", "High Cable Curl"] },
+          { name: "Lower", ex: ["Hack Squat", "Machine Leg Extension", "Barbell Romanian Deadlift", "Machine Leg Press", "Machine Seated Leg Curl", "Machine Lying Leg Curl", "Walking Lunge", "Standing Calf Raise"] },
+          { name: "Delts + Arms", ex: ["Seated Machine Lateral Raise", "Machine Shoulder Press", "Chest Supported Dumbbell Lateral Raise", "Face Pull", "Dumbbell Incline Curl", "Cable Rope Tricep Pressdown", "Single Arm Cross-Body Cable Tricep Extension"] },
+          { name: "Chest + Back", ex: ["Cable Grip Lat Pulldown (Narrow Grip)", "Flat Smith Machine Chest Press", "Single Arm Dumbbell Row", "Incline Barbell Press", "Barbell Row (use straps)", "Pec Deck Fly", "Cable Crunch"] },
+        ];
+        const mapIds = (list) => list.map((n) => byName[n.trim().toLowerCase()]).filter(Boolean);
+        const progId = (rt.find((r) => r.programId) || {}).programId || null;
+        rt = rt.map((r) => {
+          const spec = SPEC2.find((sp) => sp.name.toLowerCase() === r.name.trim().toLowerCase());
+          return spec ? { ...r, exerciseIds: mapIds(spec.ex) } : r;
+        });
+        SPEC2.forEach((sp) => {
+          if (!rt.some((r) => r.name.trim().toLowerCase() === sp.name.toLowerCase())) {
+            rt = [...rt, { id: uid(), name: sp.name, color: "#DE3417", programId: progId, exerciseIds: mapIds(sp.ex) }];
+          }
+        });
+        store.set("routines", rt);
+        packs = [...packs, "routines-andy-3"];
       }
       store.set("exercises", ex);
       store.set("packs", packs);
@@ -1121,6 +1162,7 @@ function isCompound(ex) {
   return /(squat|deadlift|bench press|chest press|overhead press|shoulder press|military press|push press|barbell row|bent[- ]?over row|pendlay|t-bar row|seal row|romanian|rdl|hip thrust|glute bridge|pull[- ]?up|chin[- ]?up|weighted dip|^dip$|lunge|split squat|bulgarian|leg press|hack squat|power clean|clean|snatch|lat pulldown|pulldown|good morning|thruster|floor press|incline barbell press|incline dumbbell press|decline press|landmine press)/i.test((ex && ex.name) || "");
 }
 function liftDefaults(ex) {
+  if (ex && ex.scheme) return ex.scheme;
   return isCompound(ex) ? { warmups: 2, work: 2, lo: 6, hi: 10 } : { warmups: 1, work: 3, lo: 10, hi: 15 };
 }
 function incFor(ex, unit) { const c = isCompound(ex); return unit === "lb" ? (c ? 5 : 2.5) : (c ? 2.5 : 1.25); }
