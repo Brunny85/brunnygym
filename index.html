@@ -45,12 +45,34 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
 
 :root{
-  --concrete:#E6E5DF; --concrete2:#DCDBD4;
-  --surface:#FFFFFF; --surface2:#F5F4F0;
-  --ink:#16171A; --ink2:#54575E; --steel:#8B8E95;
-  --line:#D8D6CE; --line2:#E7E5DE;
-  --accent:#DE3417; --accent2:#B7280F;
+  /* Graphite & Mint — default dark theme */
+  --concrete:#11161B; --concrete2:#0C1116;
+  --surface:#1B232B; --surface2:#24303A;
+  --ink:#F2F5F7; --ink2:#AAB7C4; --steel:#7E8B97;
+  --line:#34414D; --line2:#2A353F;
+  --primary:#73DDC3; --onprimary:#10241F;
+  --accent:#E0604C; --accent2:#C74B38;   /* destructive / above range */
+  --good:#3FBF8F;                         /* completed / within range */
+  --warn:#E8B04C;                         /* attention / mixed */
+  --navbg:rgba(18,25,31,.92);
+  --warmbg:#2A2F27; --warmline:#4A4A32; --warmink:#D9B36A;
+  --donebg:#1D3229; --doneline:#2E5546;
+  --dangerbg:#33201D;
+}
+.gt.light{
+  /* Chalk & Navy — optional light theme */
+  --concrete:#F3F5F7; --concrete2:#E9EDF1;
+  --surface:#FFFFFF; --surface2:#EAF0F5;
+  --ink:#182433; --ink2:#566575; --steel:#7C8A99;
+  --line:#D4DDE5; --line2:#E2E9EF;
+  --primary:#244D76; --onprimary:#FFFFFF;
+  --accent:#C6432F; --accent2:#A93521;
   --good:#1E9E6A;
+  --warn:#B8791E;
+  --navbg:rgba(255,255,255,.93);
+  --warmbg:#FBF4E4; --warmline:#EFE1C4; --warmink:#8A6A22;
+  --donebg:#EAF7F0; --doneline:#BFE6D2;
+  --dangerbg:#FDE9E4;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 .gt{ all:initial; }
@@ -68,12 +90,12 @@ const CSS = `
 
 /* top bar */
 .gt .top{ padding:22px 2px 12px; display:flex; align-items:flex-end; justify-content:space-between; }
-.gt .top .eyebrow{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--steel); }
-.gt .top h1{ font-family:'Archivo',sans-serif; font-weight:900; font-size:30px; letter-spacing:-.02em; text-transform:uppercase; line-height:.95; margin:2px 0 0; }
+.gt .top .eyebrow{ font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:.4px; color:var(--steel); }
+.gt .top h1{ font-family:'Archivo',sans-serif; font-weight:800; font-size:27px; letter-spacing:-.01em; line-height:1.05; margin:2px 0 0; }
 .gt .unit{ display:flex; gap:6px; }
 
 /* cards */
-.gt .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+.gt .card{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; }
 .gt .card.tight{ padding:14px; }
 .gt .ch{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .gt .ch .t{ font-family:'Archivo',sans-serif; font-weight:800; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink); display:flex; align-items:center; gap:7px;}
@@ -90,7 +112,7 @@ const CSS = `
 .gt button{ cursor:pointer; border:none; background:none; font-family:inherit; }
 .gt .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family:'Archivo',sans-serif; font-weight:800; font-size:13px; letter-spacing:1px; text-transform:uppercase; border-radius:12px; padding:14px 16px; width:100%; transition:transform .05s ease, background .15s; }
 .gt .btn:active{ transform:scale(.98); }
-.gt .btn.acc{ background:var(--accent); color:#fff; }
+.gt .btn.acc{ background:var(--primary); color:var(--onprimary); border-color:transparent; }
 .gt .btn.acc:active{ background:var(--accent2); }
 .gt .btn.dark{ background:var(--ink); color:#fff; }
 .gt .btn.ghost{ background:var(--surface2); color:var(--ink); border:1px solid var(--line); }
@@ -167,8 +189,8 @@ const CSS = `
 .gt .setrow{ display:grid; gap:8px; align-items:center; padding:5px 0; }
 .gt .setrow .setno{ font-family:'JetBrains Mono',monospace; font-weight:800; font-size:14px; color:var(--ink2); text-align:center; }
 .gt .setrow.done .setno{ color:var(--good); }
-.gt .setrow.warm .setno{ color:#B8791E; font-size:12px; }
-.gt .setrow.warm .inp{ background:#FBF4E4; border-color:#EFE1C4; }
+.gt .setrow.warm .setno{ color:var(--warmink); font-size:12px; }
+.gt .setrow.warm .inp{ background:var(--warmbg); border-color:var(--warmline); }
 .gt .setdel{ display:flex; align-items:center; justify-content:center; width:30px; height:36px; color:var(--steel); background:none; border:none; }
 .gt .setdel:active{ color:var(--accent); }
 .gt .excollapsed{ display:flex; align-items:center; gap:11px; width:100%; padding:13px 14px; background:var(--surface); border:1px solid var(--line); border-radius:16px; margin-bottom:12px; }
@@ -197,9 +219,9 @@ const CSS = `
 .gt .reorder-row.dragging .draghandle{ color:#fff; cursor:grabbing; }
 .gt .reorder-row .ord{ font-size:11px; color:var(--steel); width:16px; text-align:center; flex:none; }
 .gt .reorder-row.dragging .ord{ color:#fff; }
-.gt .inp{ width:100%; background:var(--surface2); border:1px solid var(--line); border-radius:9px; padding:11px 8px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; text-align:center; color:var(--ink); }
+.gt .inp{ width:100%; background:var(--surface2); border:1px solid var(--line); border-radius:9px; padding:11px 8px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px; text-align:center; color:var(--ink); }
 .gt .inp:focus{ outline:2px solid var(--accent); outline-offset:-1px; background:#fff; }
-.gt .setrow.done .inp{ background:#EAF7F0; border-color:#BfE6D2; }
+.gt .setrow.done .inp{ background:var(--donebg); border-color:var(--doneline); }
 .gt .ck{ width:40px; height:40px; border-radius:10px; border:1px solid var(--line); background:var(--surface2); display:flex; align-items:center; justify-content:center; color:var(--steel); }
 .gt .ck.on{ background:var(--good); border-color:var(--good); color:#fff; }
 .gt .addset{ display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:11px; margin-top:4px; border:1px dashed var(--line); border-radius:10px; color:var(--ink2); font-weight:700; font-size:12px; letter-spacing:.5px; text-transform:uppercase; background:transparent; }
@@ -207,7 +229,7 @@ const CSS = `
 /* rest timer bar */
 .gt .restbar{ position:fixed; bottom:78px; left:50%; transform:translateX(-50%); width:100%; max-width:440px; padding:0 14px; z-index:40; animation:restup .28s cubic-bezier(.2,.9,.3,1.2); }
 @keyframes restup{ from{ transform:translate(-50%,16px); opacity:0; } to{ transform:translate(-50%,0); opacity:1; } }
-.gt .restinner{ position:relative; overflow:hidden; background:rgba(18,18,21,.82); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); color:#fff; border:1px solid rgba(255,255,255,.08); border-radius:20px; padding:13px 14px 15px; display:flex; align-items:center; gap:13px; box-shadow:0 16px 40px -10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
+.gt .restinner{ position:relative; overflow:hidden; background:var(--navbg); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); color:var(--ink); border:1px solid var(--line); border-radius:20px; padding:13px 14px 15px; display:flex; align-items:center; gap:13px; box-shadow:0 16px 40px -10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
 .gt .ring{ position:relative; width:54px; height:54px; flex:none; }
 .gt .ring .cd{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:800; font-size:14.5px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .gt .restlabel{ font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,.45); }
@@ -224,10 +246,10 @@ const CSS = `
 @keyframes restpulse{ 50%{ box-shadow:0 0 0 3px rgba(222,52,23,.5), 0 16px 40px -10px rgba(0,0,0,.45); } }
 
 /* bottom nav */
-.gt .nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(255,255,255,.94); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; z-index:50; }
+.gt .nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:var(--navbg); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; z-index:50; padding-bottom:env(safe-area-inset-bottom, 0px); }
 .gt .navbtn{ flex:1; padding:9px 0 12px; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--steel); position:relative; }
 .gt .navbtn.on{ color:var(--ink); }
-.gt .navbtn.on::before{ content:''; position:absolute; top:0; width:26px; height:3px; border-radius:0 0 3px 3px; background:var(--accent); }
+.gt .navbtn.on::before{ content:''; position:absolute; top:0; width:26px; height:3px; border-radius:0 0 3px 3px; background:var(--primary); }
 .gt .navbtn span{ font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.5px; text-transform:uppercase; font-weight:700; }
 
 /* modal */
@@ -237,7 +259,7 @@ const CSS = `
 .gt .sheeth .tt{ font-family:'Archivo',sans-serif; font-weight:900; font-size:20px; text-transform:uppercase; letter-spacing:-.01em; }
 .gt .sheetfoot{ position:sticky; bottom:0; background:var(--concrete); padding:12px 0 6px; margin-top:6px; box-shadow:0 -8px 16px -8px rgba(0,0,0,.12); }
 .gt .pkghead{ display:flex; align-items:center; gap:10px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
-.gt{ --balance-over:#DE3417; --balance-balanced:#2FA25A; --balance-under:#2E6BE6; --balance-mixed:#E8A13C; --balance-neutral:transparent; }
+.gt{ --balance-over:var(--accent); --balance-balanced:var(--good); --balance-under:#4E8DE8; --balance-mixed:var(--warn); --balance-neutral:transparent; }
 .gt .muscle-path{ transition:fill 220ms ease, fill-opacity 220ms ease, filter 220ms ease; cursor:pointer; pointer-events:auto; outline:none; }
 .gt .muscle-path:hover{ filter:brightness(1.12) saturate(1.1); fill-opacity:0.8 !important; }
 .gt .muscle-path:focus-visible{ stroke:#111; stroke-width:1.3; }
@@ -255,7 +277,7 @@ const CSS = `
 .gt .archbadge{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--steel); background:var(--surface2); border:1px solid var(--line); border-radius:999px; padding:2px 7px; margin-left:8px; vertical-align:middle; }
 .gt .field{ margin-bottom:16px; }
 .gt .field label{ display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--steel); margin-bottom:8px; }
-.gt .tin{ width:100%; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:13px 14px; font-size:15px; font-weight:600; color:var(--ink); }
+.gt .tin{ width:100%; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:13px 14px; font-size:16px; font-weight:600; color:var(--ink); }
 .gt .tin:focus{ outline:2px solid var(--accent); outline-offset:-1px; }
 
 /* misc */
@@ -268,6 +290,17 @@ const CSS = `
 .gt .flash{ animation:flash .5s ease; }
 @keyframes flash{ 0%{background:#FFE3DC;} 100%{background:var(--surface);} }
 @media (prefers-reduced-motion: reduce){ .gt *{ animation:none !important; } }
+
+.gt .prevcell{ font-size:11.5px; color:var(--steel); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gt .wutoggle{ display:block; width:100%; text-align:left; background:none; border:none; color:var(--warmink); font-weight:700; font-size:12px; padding:6px 2px; }
+.gt .setrow2{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--line2); font-weight:700; font-size:14px; }
+/* accessibility */
+.gt :is(button, input, [tabindex]):focus-visible{ outline:2px solid var(--primary); outline-offset:2px; border-radius:6px; }
+.gt .navbtn{ min-height:52px; }
+.gt .iconbtn{ min-width:40px; min-height:40px; }
+@media (prefers-reduced-motion: reduce){
+  .gt *, .gt *::before, .gt *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
 `;
 
 /* ---------------- constants ---------------- */
@@ -509,7 +542,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v43";
+const APP_VERSION = "v45";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -867,6 +900,23 @@ const PPLA_EXERCISES = (() => {
   ];
 })();
 
+// 4-day upper/lower split additions (Sep 2026).
+const UL4_EXERCISES = (() => {
+  const X = (name, primary, secondary = [], trackingType = "weight_reps", category = "weight") =>
+    ({ id: "x_" + slug(name), name, category, trackingType, primary, secondary });
+  return [
+    X("Neutral Grip Seated Cable Row", ["lats", "upper_back"], ["biceps"]),
+    X("Single Arm Cable Lateral Raise", ["shoulders"]),
+    X("Barbell Preacher Curl", ["biceps"], ["forearms"]),
+    X("Cable Romanian Deadlift", ["hamstrings", "glutes"]),
+    X("Single Arm Cable Pulldown Row", ["lats"], ["biceps", "upper_back"]),
+    X("Reverse Cable Crossover (Rear Delt)", ["shoulders"], ["upper_back"]),
+    X("Supported Cable Split Squat", ["quads", "glutes"]),
+    X("Dumbbell Glute Bridge", ["glutes"], ["hamstrings"]),
+    X("Single Leg Seated Leg Extension", ["quads"]),
+  ];
+})();
+
 /* ---------------- storage ---------------- */
 const store = {
   async get(key, fb) {
@@ -950,7 +1000,18 @@ function monthBuckets(n) {
    ============================================================ */
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("home");
+  const [tab, setTabRaw] = useState("today");
+  const [liveOpen, setLiveOpen] = useState(true);   // Train: live session vs programme list
+  const [progressSub, setProgressSub] = useState("overview"); // overview | history | calendar | muscles
+  // Legacy tab names route into the 4-tab structure so existing calls keep working
+  const setTab = (t) => {
+    if (t === "home") t = "today";
+    else if (t === "workout") { setLiveOpen(true); t = "train"; }
+    else if (t === "routines") { setLiveOpen(false); t = "train"; }
+    else if (t === "history") { setProgressSub("history"); t = "progress"; }
+    else if (t === "calendar") { setProgressSub("calendar"); t = "progress"; }
+    setTabRaw(t);
+  };
   const [exercises, setEx] = useState([]);
   const [routines, setRt] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -961,6 +1022,19 @@ export default function App() {
   const [restDefault, setRestDefault] = useState(90);
   const [activeProgramId, setActiveProgramId] = useState(null); // null = score all non-archived
   const [saveError, setSaveError] = useState(false);
+  const [theme, setTheme] = useState("dark"); // dark | light | system
+  const [sysDark, setSysDark] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showBackupApp, setShowBackupApp] = useState(false);
+  const [appToast, setAppToast] = useState("");
+  const appFlash = (m) => { setAppToast(m); setTimeout(() => setAppToast(""), 1800); };
+  useEffect(() => {
+    if (theme !== "system" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const h = () => setSysDark(mq.matches);
+    h(); mq.addEventListener ? mq.addEventListener("change", h) : mq.addListener(h);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", h) : mq.removeListener(h); };
+  }, [theme]);
   const [rest, setRest] = useState(null); // {total, left, running}
 
   const packsRef = useRef([]);
@@ -989,6 +1063,7 @@ export default function App() {
       applyPack("andy-split-2", SPLIT2_EXERCISES);
       applyPack("andy-ul-1", UL_EXERCISES);
       applyPack("andy-ppla-1", PPLA_EXERCISES);
+      applyPack("andy-ul4-1", UL4_EXERCISES);
       // ensure every exercise has sub-muscle tags (covers newly added packs too)
       ex = ex.map((e) => (e.subMuscles && e.subMuscles.length) ? e : { ...e, subMuscles: inferSubMuscles(e) });
       if (!packs.includes("submuscle-1")) packs = [...packs, "submuscle-1"];
@@ -1140,6 +1215,44 @@ export default function App() {
         store.set("routines", rt);
         packs = [...packs, "routines-andy-7"];
       }
+      if (!packs.includes("routines-andy-8")) {
+        const byName8 = {};
+        ex.forEach((e) => { byName8[e.name.trim().toLowerCase()] = e.id; });
+        const N8 = (n) => byName8[n.toLowerCase()];
+        // [name, workingSets, warmups, lo, hi, restSec]
+        const C = 150, I = 100; // 2-3 min compounds, 90-120 s isolation
+        const SPLIT4 = [
+          { name: "Upper A — Chest, Back, Shoulders, Biceps", color: "#2E6BE6", ex: [
+            ["Incline Dumbbell Press", 2, 2, 8, 12, C], ["Chest Supported T-Bar Row", 2, 2, 6, 10, C], ["Neutral Grip Seated Cable Row", 2, 1, 8, 12, C],
+            ["Standing Cable Fly", 2, 0, 10, 15, I], ["Single Arm Cable Lateral Raise", 2, 0, 12, 20, I], ["Face Pull", 2, 0, 12, 20, I],
+            ["Barbell Preacher Curl", 2, 1, 10, 15, I], ["Rope Hammer Curl", 2, 0, 10, 15, I]] },
+          { name: "Lower A — Legs & Triceps", color: "#12A5A0", ex: [
+            ["Machine Leg Press", 2, 2, 8, 12, C], ["Cable Romanian Deadlift", 2, 1, 8, 12, C], ["Machine Leg Extension", 2, 0, 10, 15, I],
+            ["Machine Seated Leg Curl", 2, 1, 10, 15, I], ["Standing Calf Raise", 3, 1, 10, 15, I], ["Straight Bar Pushdown", 2, 1, 10, 15, I]] },
+          { name: "Upper B — Chest, Back, Shoulders, Triceps", color: "#F2A81E", ex: [
+            ["Single Arm Cable Pulldown Row", 2, 2, 8, 12, C], ["High to Low Cable Fly", 2, 1, 10, 15, I], ["Machine Seated Row", 2, 1, 6, 10, C],
+            ["Low to High Cable Fly", 2, 0, 10, 15, I], ["Dumbbell Lateral Raise", 2, 0, 12, 20, I], ["Reverse Cable Crossover (Rear Delt)", 2, 0, 12, 20, I],
+            ["Cable Rope Tricep Pressdown", 2, 1, 10, 15, I], ["Single Arm Cross-Body Cable Tricep Extension", 2, 0, 10, 15, I]] },
+          { name: "Lower B — Legs & Biceps", color: "#159C86", ex: [
+            ["Machine Seated Leg Curl", 2, 2, 10, 15, I], ["Supported Cable Split Squat", 2, 1, 8, 12, C], ["Dumbbell Glute Bridge", 2, 1, 10, 15, I],
+            ["Single Leg Seated Leg Extension", 2, 0, 10, 15, I], ["Leg Press Calf Raise", 3, 1, 10, 15, I], ["Cable Curl", 2, 1, 10, 15, I]] },
+        ];
+        const progs8 = await store.get("programs", []);
+        const archivedAll = progs8.map((p) => ({ ...p, archived: true }));
+        const ul4Id = uid();
+        const newRts8 = SPLIT4.map((spec) => {
+          const ids = []; const so = {}; const wo = {}; const rep = {}; const rst = {};
+          spec.ex.forEach(([n, w, wu, lo, hi, rr]) => { const id = N8(n); if (id) { ids.push(id); so[id] = w; wo[id] = wu; rep[id] = [lo, hi]; rst[id] = rr; } });
+          return { id: uid(), name: spec.name, color: spec.color, programId: ul4Id, exerciseIds: ids, setOverrides: so, wuOverrides: wo, repOverrides: rep, restOverrides: rst };
+        });
+        rt = [...rt, ...newRts8];
+        store.set("programs", [...archivedAll, { id: ul4Id, name: "Upper / Lower — 4-Day", color: "#73DDC3", createdAt: Date.now() }]);
+        store.set("routines", rt);
+        const st8 = await store.get("settings", {});
+        store.set("settings", { ...st8, activeProgramId: ul4Id });
+        setActiveProgramId(ul4Id);
+        packs = [...packs, "routines-andy-8"];
+      }
       // repair: remove duplicate-id exercises (name variants that slugged to
       // the same id across packs). Duplicate React keys corrupt the exercise
       // picker after the first selection. References stay valid: the surviving
@@ -1155,7 +1268,7 @@ export default function App() {
       const act0 = await store.get("activeSession", null);
       setActive(act0 && act0.entries ? { ...act0, entries: act0.entries.map((en0) => en0.id ? en0 : { ...en0, id: uid() }) } : act0);
       const s = await store.get("settings", {});
-      if (s.unit) setUnit(s.unit); if (s.dist) setDist(s.dist); if (s.restDefault) setRestDefault(s.restDefault); if (s.activeProgramId !== undefined) setActiveProgramId(s.activeProgramId);
+      if (s.unit) setUnit(s.unit); if (s.dist) setDist(s.dist); if (s.restDefault) setRestDefault(s.restDefault); if (s.activeProgramId !== undefined) setActiveProgramId(s.activeProgramId); if (s.theme) setTheme(s.theme);
       setLoading(false);
     })();
   }, []);
@@ -1167,8 +1280,8 @@ export default function App() {
   const saveProg = (n) => { setPrograms(n); return persist("programs", n); };
   const saveSess = (n) => { setSess(n); return persist("sessions", n); };
   const saveActive = (n) => { setActive(n); return persist("activeSession", n); };
-  const settingsObj = () => ({ unit, dist, restDefault, activeProgramId });
-  useEffect(() => { if (!loading) persist("settings", settingsObj()); }, [unit, dist, restDefault, activeProgramId, loading]);
+  const settingsObj = () => ({ unit, dist, restDefault, activeProgramId, theme });
+  useEffect(() => { if (!loading) persist("settings", settingsObj()); }, [unit, dist, restDefault, activeProgramId, theme, loading]);
 
   // rest timer engine — wall-clock anchored: iOS freezes JS timers when the
   // app is backgrounded, so we store an end timestamp and derive the remainder.
@@ -1235,6 +1348,7 @@ export default function App() {
       if (obj.settings.unit) setUnit(obj.settings.unit);
       if (obj.settings.dist) setDist(obj.settings.dist);
       if (obj.settings.restDefault) setRestDefault(obj.settings.restDefault);
+      if (obj.settings.theme) setTheme(obj.settings.theme);
       if (obj.settings.activeProgramId !== undefined) setActiveProgramId(obj.settings.activeProgramId);
       writes.push(store.set("settings", { unit: obj.settings.unit || unit, dist: obj.settings.dist || dist, restDefault: obj.settings.restDefault || restDefault, activeProgramId: obj.settings.activeProgramId !== undefined ? obj.settings.activeProgramId : activeProgramId }));
     }
@@ -1316,38 +1430,62 @@ export default function App() {
     );
   }
 
+  const effLight = theme === "light" || (theme === "system" && !sysDark);
   return (
-    <div className="gt">
+    <div className={"gt" + (effLight ? " light" : "")}>
       <style>{CSS}</style>
       <div className="wrap">
-        {tab === "home" && (
-          <Dashboard {...{ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt }} />
+        {tab === "today" && (
+          <Today {...{ active, sessions, routines, programs, exById, activeProgramId, unit, restDefault, setTab }}
+            onResume={() => { setLiveOpen(true); setTabRaw("train"); }}
+            onOpenSettings={() => setShowSettings(true)}
+            onOpenMuscles={() => { setProgressSub("muscles"); setTabRaw("progress"); }} />
         )}
-        {tab === "routines" && (
-          <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault, activeProgramId, setActiveProgramId }} />
-        )}
-        {tab === "workout" && (
-          <Workout {...{ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab, routines, saveRt, saveEx }} stopRest={() => setRest(null)} />
+        {tab === "train" && (
+          <>
+            {active && (
+              <div className="card tight" style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+                <span style={{ flex: 1, fontWeight: 800, fontSize: 13.5 }}>{liveOpen ? active.routineName : "Session in progress: " + active.routineName}</span>
+                <button className="btn dark sm" onClick={() => setLiveOpen(!liveOpen)}>{liveOpen ? "Browse workouts" : "Back to session"}</button>
+              </div>
+            )}
+            {active && liveOpen ? (
+              <Workout {...{ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab, routines, saveRt, saveEx }} stopRest={() => setRest(null)} />
+            ) : (
+              <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault, activeProgramId, setActiveProgramId }} />
+            )}
+          </>
         )}
         {tab === "library" && (
           <LibraryView {...{ exercises, saveEx, routines }} />
         )}
-        {tab === "calendar" && (
-          <CalendarView {...{ sessions, quickLog, deleteSession }} />
-        )}
         {saveError && (
-          <div className="card tight" style={{ background: "#FDE9E4", border: "1px solid var(--accent)", color: "var(--accent)", fontSize: 12.5, fontWeight: 700 }}>
+          <div className="card tight" style={{ background: "var(--dangerbg)", border: "1px solid var(--accent)", color: "var(--accent)", fontSize: 12.5, fontWeight: 700 }}>
             A storage write failed — recent changes may not be saved. Export a backup from the Data card, then free up space and tap Save now. <button className="btn dark sm" style={{ marginLeft: 8 }} onClick={() => { saveNow(); setSaveError(false); }}>Retry save</button>
           </div>
         )}
-        {tab === "history" && (
-          <HistoryView {...{ sessions, routines, programs, exById, dist }} />
+        {tab === "progress" && (
+          <>
+            <div className="top">
+              <div><div className="eyebrow">Iron & Chalk</div><h1>Progress</h1></div>
+              <button className="iconbtn" aria-label="Settings" onClick={() => setShowSettings(true)}><Layers size={19} /></button>
+            </div>
+            <div className="seg" style={{ display: "flex", marginBottom: 14 }}>
+              {[["overview", "Overview"], ["history", "History"], ["calendar", "Calendar"], ["muscles", "Muscles"]].map(([id, lb]) => (
+                <button key={id} className={progressSub === id ? "on" : ""} onClick={() => setProgressSub(id)} style={{ flex: 1 }}>{lb}</button>
+              ))}
+            </div>
+            {progressSub === "overview" && <Dashboard mode="overview" {...{ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt }} />}
+            {progressSub === "muscles" && <Dashboard mode="muscles" {...{ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt }} />}
+            {progressSub === "history" && <HistoryView {...{ sessions, routines, programs, exById, dist }} />}
+            {progressSub === "calendar" && <CalendarView {...{ sessions, quickLog, deleteSession }} />}
+          </>
         )}
       </div>
 
       {rest && (() => {
         const pct = rest.total ? rest.left / rest.total : 0;
-        const col = rest.left <= 5 ? "#DE3417" : rest.left <= 15 ? "#F2A81E" : "#2FA25A";
+        const col = rest.left <= 5 ? "var(--warn)" : "var(--primary)"; // attention near zero; never red just for finishing
         return (
           <div className={`restbar ${rest.left === 0 ? "restdone" : ""}`}>
             <div className="restinner">
@@ -1378,22 +1516,53 @@ export default function App() {
 
       <nav className="nav">
         {[
-          ["home", "Home", Home],
-          ["calendar", "Calendar", CalendarDays],
-          ["routines", "Routines", ClipboardList],
-          ["workout", "Workout", Dumbbell],
-          ["history", "History", HistoryIcon],
+          ["today", "Today", Home],
+          ["train", "Train", Dumbbell],
+          ["progress", "Progress", TrendingUp],
           ["library", "Library", LibraryIcon],
         ].map(([id, label, Icon]) => (
-          <button key={id} className={`navbtn ${tab === id ? "on" : ""}`} onClick={() => setTab(id)}>
+          <button key={id} className={`navbtn ${tab === id ? "on" : ""}`} onClick={() => setTabRaw(id)} aria-label={label}>
             <Icon size={21} strokeWidth={2.2} />
             <span>{label}</span>
-            {id === "workout" && active && (
-              <span style={{ position: "absolute", top: 6, right: "50%", marginRight: -18, width: 7, height: 7, borderRadius: 9, background: "var(--accent)" }} />
+            {id === "train" && active && (
+              <span style={{ position: "absolute", top: 6, right: "50%", marginRight: -18, width: 7, height: 7, borderRadius: 9, background: "var(--primary)" }} />
             )}
           </button>
         ))}
       </nav>
+      {showSettings && (
+        <div className="scrim" onClick={() => setShowSettings(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 26 }}>
+            <div className="sheeth"><div className="tt">Settings</div><button className="iconbtn" aria-label="Close settings" onClick={() => setShowSettings(false)}><X size={18} /></button></div>
+            <div className="setrow2"><span>Theme</span>
+              <div className="seg">
+                {["dark", "light", "system"].map((t) => <button key={t} className={theme === t ? "on" : ""} onClick={() => setTheme(t)}>{t[0].toUpperCase() + t.slice(1)}</button>)}
+              </div>
+            </div>
+            <div className="setrow2"><span>Weight unit</span>
+              <div className="seg">
+                <button className={unit === "kg" ? "on" : ""} onClick={() => setUnit("kg")}>kg</button>
+                <button className={unit === "lb" ? "on" : ""} onClick={() => setUnit("lb")}>lb</button>
+              </div>
+            </div>
+            <div className="setrow2"><span>Distance</span>
+              <div className="seg">
+                <button className={dist === "km" ? "on" : ""} onClick={() => setDist("km")}>km</button>
+                <button className={dist === "mi" ? "on" : ""} onClick={() => setDist("mi")}>mi</button>
+              </div>
+            </div>
+            <div className="setrow2"><span>Rest between sets</span>
+              <div className="seg">
+                {[45, 60, 90, 120, 180].map((v) => <button key={v} className={"mono " + (restDefault === v ? "on" : "")} onClick={() => setRestDefault(v)}>{v}</button>)}
+              </div>
+            </div>
+            <button className="btn dark" style={{ width: "100%", marginTop: 14 }} onClick={() => { setShowSettings(false); setShowBackupApp(true); }}><Save size={15} /> Data & backup</button>
+            <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>App {APP_VERSION} · {sessions.length} workouts saved</p>
+          </div>
+        </div>
+      )}
+      {showBackupApp && <BackupSheet backup={backup} flash={appFlash} onClose={() => setShowBackupApp(false)} />}
+      {appToast && <div className="toast">{appToast}</div>}
     </div>
   );
 }
@@ -1521,7 +1690,110 @@ function MuscleTags({ ids, half }) {
 /* ============================================================
    DASHBOARD
    ============================================================ */
-function Dashboard({ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt }) {
+function Today({ active, sessions, routines, programs, exById, activeProgramId, unit, restDefault, setTab, onResume, onOpenSettings, onOpenMuscles }) {
+  const now = new Date();
+  const activeProg = (programs || []).find((p) => p.id === activeProgramId) || null;
+  // last 7 local days
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate() - i); days.push(dayKey(d.getTime())); }
+  const sessDays = new Set(sessions.filter((s) => !s.quick).map((s) => dayKey(s.date)));
+  const weekCount = sessions.filter((s) => !s.quick && days.includes(dayKey(s.date))).length;
+  const last = sessions.find((s) => !s.quick && s.entries && s.entries.length);
+  const lastDone = last ? last.entries.reduce((a, en) => a + en.sets.filter((st) => !st.warmup && isPerformedSet(st, last.completionVersion)).length, 0) : 0;
+  // planned balance summary for the active programme, using the real engine
+  const summary = (() => {
+    if (!activeProg) return null;
+    const scoped = routines.filter((r) => r.programId === activeProgramId);
+    if (!scoped.length) return null;
+    const sess = scoped.map((r) => (r.exerciseIds || []).map((id) => { const ex = exById[id]; return ex && ex.category !== "cardio" ? { ex, sets: resolvePrescription(r, ex).work } : null; }).filter(Boolean));
+    const v2 = computeV2(sess, 1);
+    let inR = 0, under = 0, over = 0;
+    Object.keys(RAILS).forEach((m) => { const st = v2.status[m]; if (st === "ok") inR++; else if (st === "under") under++; else over++; });
+    return { inR, under, over, total: Object.keys(RAILS).length };
+  })();
+  return (
+    <>
+      <div className="top">
+        <div>
+          <div className="eyebrow">Iron & Chalk</div>
+          <h1>Today</h1>
+          <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>{now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</div>
+        </div>
+        <button className="iconbtn" aria-label="Settings" onClick={onOpenSettings}><Layers size={19} /></button>
+      </div>
+      <div className="card">
+        {active ? (
+          <>
+            <div className="muted" style={{ fontSize: 12 }}>Session in progress</div>
+            <div style={{ fontWeight: 800, fontSize: 20, margin: "2px 0 10px" }}>{active.routineName}</div>
+            <button className="btn acc" style={{ width: "100%" }} onClick={onResume}><Play size={16} /> Resume workout</button>
+          </>
+        ) : (
+          <>
+            <div className="muted" style={{ fontSize: 12 }}>{activeProg ? "Active routine: " + activeProg.name : "No active routine"}</div>
+            <div style={{ fontWeight: 800, fontSize: 20, margin: "2px 0 10px" }}>Ready to train?</div>
+            <button className="btn acc" style={{ width: "100%" }} onClick={() => setTab("routines")}><Play size={16} /> Start a workout</button>
+          </>
+        )}
+      </div>
+      <div className="card">
+        <div className="ch"><div className="t"><CalendarDays size={15} /> This week</div>
+          <span className="mono" style={{ fontSize: 12, color: "var(--ink2)" }}>{weekCount} session{weekCount === 1 ? "" : "s"} in the last 7 days</span>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {days.map((k) => {
+            const d = new Date(k + "T12:00:00");
+            const hit = sessDays.has(k);
+            return (
+              <div key={k} style={{ flex: 1, textAlign: "center" }}>
+                <div className="mono" style={{ fontSize: 10, color: "var(--steel)" }}>{d.toLocaleDateString(undefined, { weekday: "narrow" })}</div>
+                <div aria-label={hit ? "Trained" : "Rest day"} style={{ marginTop: 4, height: 26, borderRadius: 8, background: hit ? "var(--good)" : "var(--surface2)", border: "1px solid " + (hit ? "transparent" : "var(--line)"), display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {hit && <Check size={13} color="#fff" />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="card">
+        <div className="ch"><div className="t"><Activity size={15} /> Muscle balance</div>
+          <span className="mono" style={{ fontSize: 11, color: "var(--steel)" }}>Planned{activeProg ? " · " + activeProg.name : ""}</span>
+        </div>
+        {summary ? (
+          <>
+            <p style={{ margin: "0 0 10px", fontSize: 14 }}>
+              <b>{summary.inR} of {summary.total}</b> muscles within reference range
+              {summary.under ? <> · <span style={{ color: "var(--balance-under)", fontWeight: 700 }}>{summary.under} below</span></> : null}
+              {summary.over ? <> · <span style={{ color: "var(--accent)", fontWeight: 700 }}>{summary.over} above</span></> : null}
+            </p>
+            <button className="btn dark sm" onClick={onOpenMuscles}>Open body map</button>
+          </>
+        ) : (
+          <p className="muted">Set an active routine in Train to see its planned balance here.</p>
+        )}
+      </div>
+      <div className="card">
+        <div className="ch"><div className="t"><Flame size={15} /> Last workout</div>
+          {last && <span className="mono" style={{ fontSize: 11, color: "var(--steel)" }}>{relDay(last.date)}</span>}
+        </div>
+        {last ? (
+          <button className="lrow" style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0 }} onClick={() => setTab("history")}>
+            <div className="grow">
+              <div className="name">{last.routineName}</div>
+              <div className="sub">{fmtDur(last.durationSec)} · {lastDone} completed working sets</div>
+            </div>
+            <ChevronRight size={16} color="var(--steel)" />
+          </button>
+        ) : (
+          <p className="muted">No workouts logged yet. Pick a routine in Train and start lifting.</p>
+        )}
+      </div>
+    </>
+  );
+}
+
+function Dashboard({ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt, mode }) {
+  const show = (k) => !mode || (mode === "overview" ? ["load", "cardio", "progress"].includes(k) : mode === "muscles" ? k === "map" : true);
   const [loadMode, setLoadMode] = useState("sets"); // sets | volume
   const [openGroup, setOpenGroup] = useState(null);
   const [bmMetric, setBmMetric] = useState("sets");
@@ -1577,7 +1849,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
   const now = new Date();
   return (
     <>
-      <div className="top">
+      {!mode && (<div className="top">
         <div>
           <div className="eyebrow">{now.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</div>
           <h1>Dashboard</h1>
@@ -1605,17 +1877,17 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
         <div className="stat"><div className="k">Streak</div><div className="v mono">{stats.streak}<span className="u">days</span></div></div>
         <div className="stat"><div className="k">Volume / 7d</div><div className="v mono">{stats.vol.toLocaleString()}<span className="u">{unit}</span></div></div>
         <div className="stat"><div className="k">Cardio / 7d</div><div className="v mono">{stats.cardioMin}<span className="u">min</span></div></div>
-      </div>
+      </div>)}
 
       {/* last workout */}
-      <div className="card">
+      <div className="card" style={{ display: show("last") ? undefined : "none" }}>
         <div className="ch"><div className="t"><Flame size={15} /> Last Workout</div>
           {last && <span className="mono" style={{ fontSize: 11, color: "var(--steel)" }}>{relDay(last.date)}</span>}
         </div>
         {last ? (
           <>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
-              <span className="disp" style={{ fontWeight: 900, fontSize: 22, textTransform: "uppercase" }}>{last.routineName}</span>
+              <span className="disp" style={{ fontWeight: 900, fontSize: 22 }}>{last.routineName}</span>
               <span className="mono" style={{ fontSize: 12, color: "var(--steel)" }}>{fmtDur(last.durationSec)}</span>
             </div>
             {last.entries.slice(0, 5).map((en, i) => {
@@ -1637,7 +1909,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
       </div>
 
       {/* muscle load */}
-      <div className="card">
+      <div className="card" style={{ display: show("load") ? undefined : "none" }}>
         <div className="ch">
           <div className="t"><Activity size={15} /> Muscle Load · 7d</div>
           <div className="seg">
@@ -1658,7 +1930,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
       </div>
 
       {/* body map */}
-      <div className="card">
+      <div className="card" style={{ display: show("map") ? undefined : "none" }}>
         <div className="ch">
           <div className="t"><Activity size={15} /> Body Map</div>
           <div className="seg">
@@ -1740,7 +2012,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
       </div>
 
       {/* cardio */}
-      <div className="card">
+      <div className="card" style={{ display: show("cardio") ? undefined : "none" }}>
         <div className="ch"><div className="t"><TrendingUp size={15} /> Cardio · 7d</div></div>
         <div style={{ display: "flex", gap: 24 }}>
           <div><div className="stat" style={{ border: "none", padding: 0 }}><div className="k">Time</div><div className="v mono">{stats.cardioMin}<span className="u">min</span></div></div></div>
@@ -1753,7 +2025,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
 
       {/* progress */}
       {progress.length > 0 && (
-        <div className="card">
+        <div className="card" style={{ display: show("progress") ? undefined : "none" }}>
           <div className="ch"><div className="t"><TrendingUp size={15} /> Progress</div></div>
           {progress.map((p) => (
             <div className="lrow" key={p.id}>
@@ -1772,8 +2044,8 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
       )}
 
       {/* data & backup */}
-      <div className="divlabel">Your data</div>
-      <div className="card">
+      <div className="divlabel" style={{ display: !mode ? undefined : "none" }}>Your data</div>
+      <div className="card" style={{ display: !mode ? undefined : "none" }}>
         <div className="ch"><div className="t"><Save size={15} /> Data & Backup</div>
           <span className="mono" style={{ fontSize: 11, color: "var(--steel)" }}>{APP_VERSION} · {backup.counts.sessions} workouts saved</span>
         </div>
@@ -1920,7 +2192,7 @@ function MuscleDetail({ group, sessions, exById, unit, onClose }) {
         </div>
 
         <div className="card" style={{ marginBottom: 14 }}>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--steel)" }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--steel)" }}>
             This {period}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
@@ -2281,7 +2553,7 @@ function WorkoutDetail({ routine, exById, sessions, restDefault, onStart, onEdit
         ) : null}
         <button className="btn acc" disabled={!names.length} onClick={() => onStart(live)}><Play size={16} /> Start workout</button>
         <div className="card" style={{ marginTop: 12 }}>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 8 }}>Exercises · drag to reorder</div>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", marginBottom: 8 }}>Exercises · drag to reorder</div>
           {order.length ? (
             <ReorderList
               items={order.map((id) => { const e = exById[id]; return { id, name: e ? e.name : id, sub: e ? (e.primary || []).map((m) => muscleById[m]?.name).filter(Boolean).join(", ") : "" }; })}
@@ -2290,7 +2562,7 @@ function WorkoutDetail({ routine, exById, sessions, restDefault, onStart, onEdit
           <CoverageStrip routine={live} exById={exById} />
           {bmItems.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 4 }}>Body map</div>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", marginBottom: 4 }}>Body map</div>
               <BodyMap items={bmItems} />
             </div>
           )}
@@ -2414,7 +2686,7 @@ function CoverageStrip({ routine, exById }) {
   if (cov.strength === 0) {
     return (
       <div style={{ marginTop: 12 }}>
-        <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)" }}>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)" }}>
           {cov.cardio ? "Cardio session · no muscle targets" : "Add exercises to see coverage"}
         </div>
       </div>
@@ -2423,7 +2695,7 @@ function CoverageStrip({ routine, exById }) {
 
   return (
     <div style={{ marginTop: 14 }}>
-      <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
+      <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
         <span>Muscle coverage</span>
         <span style={{ color: missed.length ? "var(--accent)" : "var(--good)" }}>{hit.length}/{GROUPS.length} groups</span>
       </div>
@@ -2546,7 +2818,7 @@ function RoutineEditor({ routine, exercises, onSave, onClose }) {
         <div className="field">
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Exercises · {ids.length} selected</span>
-            {ids.length > 0 && <button onClick={() => setIds([])} style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700 }}>Clear all</button>}
+            {ids.length > 0 && <button onClick={() => setIds([])} style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: 1, fontWeight: 700 }}>Clear all</button>}
           </label>
           {ids.length > 0 && (
             <>
@@ -2622,6 +2894,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   const [reordering, setReordering] = useState(false);
   const [orderDirty, setOrderDirty] = useState(false);
   const [creating, setCreating] = useState(false);  // new-exercise editor
+  const [wuHidden, setWuHidden] = useState({});     // entryId -> warm-ups collapsed
   useEffect(() => { if (!skipped) return; const t = setTimeout(() => setSkipped(null), 8000); return () => clearTimeout(t); }, [skipped]);
 
   useEffect(() => {
@@ -2742,14 +3015,14 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     <>
       <div className="top">
         <div>
-          <div className="eyebrow mono">Started {new Date(active.startedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {fmtTime(elapsed)} elapsed{active.plannedMin ? ` / ${active.plannedMin}m planned` : ""}</div>
+          <div className="eyebrow mono">Started {new Date(active.startedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {fmtTime(elapsed)} elapsed{active.plannedMin ? ` / ${active.plannedMin}m planned` : ""} · {active.entries.filter((e9) => e9.sets.length && e9.sets.every((s9) => s9.done)).length}/{active.entries.length} exercises</div>
           <h1>{active.routineName}</h1>
         </div>
         <button className="btn acc sm" onClick={() => setConfirm(true)}><Check size={15} /> Finish</button>
       </div>
 
       <div className="card tight" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", display: "inline-flex", alignItems: "center", gap: 6 }}><TimerIcon size={13} /> Rest between sets</span>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", display: "inline-flex", alignItems: "center", gap: 6 }}><TimerIcon size={13} /> Rest between sets</span>
         <div className="seg" style={{ marginLeft: "auto" }}>
           {[45, 60, 90, 120, 180].map((s) => (
             <button key={s} className={`mono ${restDefault === s ? "on" : ""}`} onClick={() => setRestDefault(s)}>{s}</button>
@@ -2769,7 +3042,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
         const ex = exById[en.exerciseId]; if (!ex) return null;
         const fields = TRACKING[ex.trackingType].fields;
         const last = lastFor(en.exerciseId);
-        const cols = `28px ${fields.map(() => "1fr").join(" ")} 40px 30px`;
+        const cols = `28px 54px ${fields.map(() => "1fr").join(" ")} 42px 30px`;
         const lastTxt = last ? last.sets.map((s) => {
           if (s.weight) return `${s.weight}×${s.reps}`;
           if (s.timeSec) return fmtTime(s.timeSec);
@@ -2818,6 +3091,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
             <div className="setgrid">
               <div className="setlabels" style={{ gridTemplateColumns: cols }}>
                 <span></span>
+                <span style={{ textAlign: "center" }}>prev</span>
                 {fields.map((f) => <span key={f} style={{ textAlign: "center" }}>{f === "weight" ? unit : f === "distance" ? dist : f === "time" ? "m:ss" : f}</span>)}
                 <span></span>
                 <span></span>
@@ -2828,20 +3102,31 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                 const labelled = en.sets.map((s) => ({ s, label: s.warmup ? `W${++wc}` : `${++sc}` }));
                 const work = en.sets.filter((s) => !s.warmup);
                 const progressed = ex.category !== "cardio" && work.length > 0 && work.every((s) => s.done && num(s.reps) >= d.hi);
-                return (
-                  <>
-                    {labelled.map(({ s, label }) => (
+                const wus = en.sets.filter((x9) => x9.warmup);
+                const wuDone = wus.length > 0 && wus.every((x9) => x9.done);
+                const wuKey = en.id || en.exerciseId;
+                const wuCollapsed = wuHidden[wuKey] !== undefined ? wuHidden[wuKey] : wuDone;
+                const rowFor = ({ s, label }) => (
                       <div className={`setrow ${s.done ? "done" : ""} ${s.warmup ? "warm" : ""}`} key={s.id} style={{ gridTemplateColumns: cols }}>
                         <span className="setno">{label}</span>
+                        <span className="prevcell mono" aria-label="Previous session">{s.phw ? `${s.phw}×${s.phr || "?"}` : s.phr ? `×${s.phr}` : "–"}</span>
                         {fields.map((f) => (
                           <input key={f} className="inp" inputMode={f === "time" ? "text" : "decimal"}
-                            value={s[f]} placeholder={f === "weight" && s.phw ? s.phw : f === "reps" ? (s.phr || (!s.warmup && s.target) || "0") : f === "time" ? "0:00" : "0"}
+                            value={s[f]} placeholder={f === "reps" ? ((!s.warmup && s.target) || "0") : f === "time" ? "0:00" : "0"}
                             onChange={(e) => update(ei, s.id, f, e.target.value)} />
                         ))}
-                        <button className={`ck ${s.done ? "on" : ""}`} onClick={() => toggleDone(ei, s.id)}><Check size={18} /></button>
+                        <button className={`ck ${s.done ? "on" : ""}`} aria-label={s.done ? "Mark set incomplete" : "Complete set"} onClick={() => toggleDone(ei, s.id)}><Check size={18} /></button>
                         <button className="setdel" aria-label="Delete set" onClick={() => removeSet(ei, s.id)}><X size={15} /></button>
                       </div>
-                    ))}
+                );
+                return (
+                  <>
+                    {wus.length > 0 && (
+                      <button className="wutoggle" onClick={() => setWuHidden((h) => ({ ...h, [wuKey]: !wuCollapsed }))}>
+                        {wuCollapsed ? "▸" : "▾"} Warm-ups ({wus.filter((x9) => x9.done).length}/{wus.length}{wuDone ? " · done" : ""})
+                      </button>
+                    )}
+                    {labelled.filter(({ s }) => !(s.warmup && wuCollapsed)).map(rowFor)}
                     {ex.category !== "cardio" ? (
                       <div style={{ display: "flex", gap: 8 }}>
                         <button className="addset" style={{ flex: 1 }} disabled={en.sets.filter((x) => x.warmup).length >= 3} onClick={() => addWarmup(ei)}><Plus size={15} /> Warm-up</button>
@@ -3175,7 +3460,7 @@ function ExerciseEditor({ exercise, onSave, onClose }) {
             <label>Sub-muscles · optional · {subMuscles.filter((id) => availableSubs.has(id)).length}</label>
             {subMuscleMuscles.map((m) => (
               <div key={m} style={{ marginBottom: 12 }}>
-                <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 7, display: "flex", alignItems: "center", gap: 6 }}>
+                <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", marginBottom: 7, display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="dot" style={{ background: muscleById[m].color, width: 8, height: 8, borderRadius: 2 }} />{muscleById[m].name}
                 </div>
                 <div className="tags">
@@ -3245,7 +3530,7 @@ function CalendarView({ sessions, quickLog, deleteSession }) {
       <div className="card">
         <div className="ch" style={{ marginBottom: 8 }}>
           <button className="iconbtn" onClick={prev}><ChevronLeft size={18} /></button>
-          <div className="disp" style={{ fontWeight: 800, fontSize: 16, textTransform: "uppercase", letterSpacing: .5 }}>{monthLabel}</div>
+          <div className="disp" style={{ fontWeight: 800, fontSize: 16, letterSpacing: .5 }}>{monthLabel}</div>
           <button className="iconbtn" onClick={next} disabled={isFuture} style={isFuture ? { opacity: .35 } : {}}><ChevronRight size={18} /></button>
         </div>
 
@@ -3880,7 +4165,7 @@ function MuscleZoom({ muscle, heat, colorFor, items, edit, exercises, v2, onClos
           const DK = ["biceps", "triceps", "delt_side", "calves"];
           return (
             <div className="card">
-              <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 8 }}>Estimated effective sets · weekly</div>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", marginBottom: 8 }}>Estimated effective sets · weekly</div>
               {railKeys.map((k) => {
                 const v = v2.weekly[k] || 0; const [lo, hi] = RAILS[k]; const st = v2.status[k];
                 const third = (hi - lo) / 3;
@@ -3899,7 +4184,7 @@ function MuscleZoom({ muscle, heat, colorFor, items, edit, exercises, v2, onClos
           );
         })()}
         <div className="card">
-          <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 10 }}>Heads worked</div>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: "var(--steel)", marginBottom: 10 }}>Heads worked</div>
           {info.heads.map((hd) => { const v = heat[hd.id] || 0; return (
             <div className="mbar" key={hd.id} style={{ marginBottom: 9 }}>
               <div className="row"><span className="nm" style={{ fontSize: 13 }}>{hd.name}</span></div>
