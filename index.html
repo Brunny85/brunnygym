@@ -177,6 +177,13 @@ const CSS = `
 .gt .excollapsed .donedot.on{ background:var(--good); color:#fff; }
 .gt .excollapsed .colmeta{ display:block; font-size:10.5px; color:var(--steel); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .gt .archbadge.on{ background:var(--good); color:#fff; border-color:transparent; }
+.gt .activetoggle{ display:flex; align-items:center; justify-content:center; align-self:center; width:32px; height:32px; border-radius:999px; color:var(--steel); background:none; border:none; flex:none; }
+.gt .activetoggle.on{ color:#fff; background:var(--good); }
+.gt .memchip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:var(--ink2); background:var(--surface2); border:1px solid var(--line); border-radius:999px; padding:3px 8px; }
+.gt .memchip .dot{ width:7px; height:7px; border-radius:999px; }
+.gt .memchip button{ display:flex; align-items:center; color:var(--steel); background:none; border:none; padding:0 0 0 2px; }
+.gt .memchip button:active{ color:var(--accent); }
+.gt .memchip.pick{ background:var(--surface); padding:6px 11px; }
 .gt .v2notes{ margin-top:10px; border-top:1px dashed var(--line); padding-top:8px; }
 .gt .vnrow{ font-size:10.5px; color:var(--ink2); padding:2px 0; }
 .gt .vnrow.warn{ color:#B8791E; }
@@ -480,13 +487,17 @@ function sessionType(s) {
 
 // How much a logged exercise-entry contributes to a group in a metric.
 // Primary hit = full weight, secondary hit = half. Cardio is excluded.
-function groupContribution(entry, group, metric) {
+function groupContribution(entry, group, metric, cv) {
   if (entry.category === "cardio") return 0;
-  const hitsPrimary = (entry.primary || []).some((m) => group.muscles.includes(m));
-  const hitsSecondary = (entry.secondary || []).some((m) => group.muscles.includes(m));
-  const factor = hitsPrimary ? 1 : hitsSecondary ? 0.5 : 0;
+  // shared pipeline: V2 routing (delt heads fold into shoulders) + the one
+  // completion rule; warm-ups never count toward hypertrophy load.
+  let factor = 0;
+  v2Routing(entry).forEach(([m, w]) => {
+    const g = m.indexOf("delt_") === 0 ? "shoulders" : m === "core" ? "core" : m;
+    if (group.muscles.includes(g)) factor = Math.max(factor, w);
+  });
   if (!factor) return 0;
-  return entry.sets.reduce((a, s) => a + (metric === "volume" ? setVolume(s) * factor : factor), 0);
+  return entry.sets.reduce((a, s) => a + ((s.warmup || !isPerformedSet(s, cv)) ? 0 : (metric === "volume" ? setVolume(s) * factor : factor)), 0);
 }
 
 const TRACKING = {
@@ -498,7 +509,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v36";
+const APP_VERSION = "v43";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -838,6 +849,24 @@ const UL_EXERCISES = (() => {
   ];
 })();
 
+// Push/Pull/Legs/Arms programme additions (from user's logged sessions).
+const PPLA_EXERCISES = (() => {
+  const X = (name, primary, secondary = [], trackingType = "weight_reps", category = "weight") =>
+    ({ id: "x_" + slug(name), name, category, trackingType, primary, secondary });
+  return [
+    X("Standing Cable Fly", ["chest"], ["shoulders"]),
+    X("Chin-Up (Mixed Grip)", ["lats", "biceps"], [], "reps"),
+    X("Chin-Up (Close Grip)", ["lats", "biceps"], [], "reps"),
+    X("Cable Tricep Pushdown (V-Bar)", ["triceps"]),
+    X("Machine Seated Row", ["lats", "upper_back"], ["biceps"]),
+    X("Dumbbell Lunge", ["quads", "glutes"], ["hamstrings"]),
+    X("Machine Calf Press", ["calves"]),
+    X("EZ Bar Preacher Curl (Close Grip)", ["biceps"]),
+    X("EZ Bar Decline Close Grip Skull Crusher", ["triceps"]),
+    X("Dumbbell Hammer Curl (Cross Body)", ["biceps"], ["forearms"]),
+  ];
+})();
+
 /* ---------------- storage ---------------- */
 const store = {
   async get(key, fb) {
@@ -845,7 +874,7 @@ const store = {
     catch (e) { return fb; }
   },
   async set(key, val) {
-    try { localStorage.setItem("gt:" + key, JSON.stringify(val)); } catch (e) {}
+    try { localStorage.setItem("gt:" + key, JSON.stringify(val)); return true; } catch (e) { return false; }
   },
 };
 
@@ -866,7 +895,19 @@ function fmtDur(sec) {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
   return h ? `${h}h ${m}m` : `${m}m`;
 }
-const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
+// Local-date key (UTC keys shifted early-morning Gulf workouts to the prior day)
+const dayKey = (ts) => { const d = new Date(ts); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+// canonical unit conversion — records are stamped with the unit they were
+// entered in; convert only at display/suggestion boundaries.
+const convW = (v, from, to) => { const f = from || "kg", t = to || "kg"; if (!v || f === t) return v || 0; return t === "lb" ? v * 2.2046226 : v / 2.2046226; };
+const roundDisp = (v) => Math.round(v * 10) / 10;
+// One completion rule: v2 sessions require the tick AND data; legacy sessions
+// (completionVersion < 2) keep their historical any-data rule — never
+// retroactively discard old performed work.
+function isPerformedSet(st, cv) {
+  const hasData = (st.reps > 0) || (st.weight > 0) || (st.timeSec > 0) || (st.distance > 0);
+  return (cv || 1) >= 2 ? (!!st.done && hasData) : hasData;
+}
 const within = (ts, days) => ts >= Date.now() - days * 864e5;
 function relDay(ts) {
   const d = Math.floor((Date.now() - ts) / 864e5);
@@ -919,8 +960,10 @@ export default function App() {
   const [dist, setDist] = useState("km");
   const [restDefault, setRestDefault] = useState(90);
   const [activeProgramId, setActiveProgramId] = useState(null); // null = score all non-archived
+  const [saveError, setSaveError] = useState(false);
   const [rest, setRest] = useState(null); // {total, left, running}
 
+  const packsRef = useRef([]);
   const exById = useMemo(() => Object.fromEntries(exercises.map((e) => [e.id, e])), [exercises]);
 
   useEffect(() => {
@@ -931,10 +974,12 @@ export default function App() {
       if (!rt) { rt = seedRoutines(); store.set("routines", rt); }
       // one-time imports: the user's own library + common movements
       let packs = await store.get("packs", []);
+      const normName = (n) => (n || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       const applyPack = (id, list) => {
         if (packs.includes(id)) return;
-        const have = new Set(ex.map((e) => e.name.trim().toLowerCase()));
-        const add = list.filter((e) => !have.has(e.name.trim().toLowerCase()));
+        const have = new Set(ex.map((e) => normName(e.name)));
+        const haveIds = new Set(ex.map((e) => e.id));
+        const add = list.filter((e) => !have.has(normName(e.name)) && !haveIds.has(e.id));
         if (add.length) ex = [...ex, ...add];
         packs = [...packs, id];
       };
@@ -943,6 +988,7 @@ export default function App() {
       applyPack("common-3", COMMON_EXERCISES_3);
       applyPack("andy-split-2", SPLIT2_EXERCISES);
       applyPack("andy-ul-1", UL_EXERCISES);
+      applyPack("andy-ppla-1", PPLA_EXERCISES);
       // ensure every exercise has sub-muscle tags (covers newly added packs too)
       ex = ex.map((e) => (e.subMuscles && e.subMuscles.length) ? e : { ...e, subMuscles: inferSubMuscles(e) });
       if (!packs.includes("submuscle-1")) packs = [...packs, "submuscle-1"];
@@ -1040,59 +1086,167 @@ export default function App() {
         store.set("routines", rt);
         packs = [...packs, "routines-andy-5"];
       }
+      if (!packs.includes("routines-andy-6")) {
+        const byName6 = {};
+        ex.forEach((e) => { byName6[e.name.trim().toLowerCase()] = e.id; });
+        const N6 = (n) => byName6[n.toLowerCase()];
+        const PPLA = [
+          { name: "Push", color: "#DE3417", ex: [["Standing Cable Fly", 3], ["Cable Lateral Raise", 3], ["Chin-Up (Mixed Grip)", 3], ["Incline Machine Press", 2], ["Dumbbell Incline Curl", 2], ["Dumbbell Seated Shoulder Press", 2], ["Cable Crossover", 2], ["Rope Hammer Curl", 2]] },
+          { name: "Pull", color: "#2E6BE6", ex: [["Wide Grip Pull Up", 3], ["Cable Rope Tricep Pressdown", 3], ["Cable Grip Lat Pulldown (Narrow Grip)", 2], ["Double Rear Delt Cable Fly", 3], ["T Bar Row", 2], ["Cable Tricep Pushdown (V-Bar)", 2], ["Machine Seated Row", 4], ["Deadlift", 2]] },
+          { name: "Legs", color: "#12A5A0", ex: [["Barbell Back Squat", 3], ["Machine Leg Press", 3], ["Barbell Romanian Deadlift", 3], ["Machine Leg Extension", 3], ["Machine Seated Leg Curl", 3], ["Dumbbell Lunge", 3], ["Machine Calf Press", 3], ["Barbell Hip Thrust", 3]] },
+          { name: "Arms", color: "#F2A81E", ex: [["Chin-Up (Close Grip)", 3], ["Dumbbell Lateral Raise", 3], ["Cable Tricep Pushdown (V-Bar)", 3], ["EZ Bar Preacher Curl (Close Grip)", 2], ["EZ Bar Decline Close Grip Skull Crusher", 3], ["Bayesian Cable Curl", 3], ["Overhead Cable Tricep Extension", 3], ["Dumbbell Hammer Curl (Cross Body)", 2]] },
+        ];
+        const pplaProgId = uid();
+        const pplaRts = PPLA.map((spec) => {
+          const ids = []; const so = {};
+          spec.ex.forEach(([n, w]) => { const id = N6(n); if (id) { ids.push(id); so[id] = w; } });
+          return { id: uid(), name: spec.name, color: spec.color, programId: pplaProgId, exerciseIds: ids, setOverrides: so };
+        });
+        rt = [...rt, ...pplaRts];
+        const progs6 = await store.get("programs", []);
+        store.set("programs", [...progs6, { id: pplaProgId, name: "Push, Pull, Legs, Arms", color: "#DE3417", createdAt: Date.now() }]);
+        store.set("routines", rt);
+        packs = [...packs, "routines-andy-6"];
+      }
+      if (!packs.includes("units-stamp-1")) {
+        // Historical records carry no unit; per owner every prior entry was
+        // made in the then-current setting, so stamp (never convert) them.
+        const st0 = await store.get("settings", {});
+        const u0 = st0.unit || "kg"; const d0 = st0.dist || "km";
+        let sess0 = await store.get("sessions", []);
+        sess0 = sess0.map((s0) => (s0.unit ? s0 : { ...s0, unit: u0, dist: d0 }));
+        store.set("sessions", sess0);
+        packs = [...packs, "units-stamp-1"];
+      }
+      if (!packs.includes("routines-andy-7")) {
+        const byName7 = {};
+        ex.forEach((e) => { byName7[e.name.trim().toLowerCase()] = e.id; });
+        const N7 = (n) => byName7[n.toLowerCase()];
+        // [name, lo, hi, restSec] — the hybrid as designed (heavy openers 6-8
+        // @120s; other compounds 8-12 @120s; isolations @90s)
+        const RX7 = {
+          "upper a — chest & back": [["Incline Machine Press", 6, 8, 120], ["Neutral Grip Lat Pulldown", 8, 12, 120], ["Neutral Grip Dumbbell Bench Press", 8, 12, 120], ["Neutral Grip Chest Supported T-Bar Row", 8, 12, 120], ["Cable Fly", 10, 15, 90], ["Cable Lateral Raise", 12, 20, 90], ["Cable Rope Tricep Pressdown", 10, 15, 90]],
+          "lower a — quad focus": [["Hack Squat", 6, 8, 120], ["Barbell Romanian Deadlift (straps)", 8, 12, 120], ["Machine Leg Press", 10, 15, 120], ["Machine Seated Leg Curl", 8, 12, 90], ["Machine Leg Extension", 12, 15, 90], ["Standing Calf Raise", 8, 12, 90]],
+          "upper b — back, delts & arms": [["Chest Supported Machine Row", 6, 10, 120], ["Single Arm Cable Row", 8, 12, 120], ["Seated Chest Press Machine", 8, 12, 120], ["Seated Machine Lateral Raise", 10, 15, 90], ["Machine Reverse Fly", 12, 20, 90], ["Rope Hammer Curl", 10, 15, 90]],
+          "lower b — posterior chain": [["Barbell Hip Thrust", 8, 12, 120], ["Bulgarian Split Squat", 8, 12, 120], ["Machine Lying Leg Curl", 8, 12, 90], ["Machine Leg Extension", 12, 15, 90], ["Cable Crunch", 10, 15, 90], ["Seated Calf Raise", 10, 15, 90], ["Cable Rope Tricep Pressdown", 10, 15, 90]],
+        };
+        rt = rt.map((r) => {
+          const spec = RX7[r.name.trim().toLowerCase()];
+          if (!spec) return r;
+          const rep = { ...(r.repOverrides || {}) }; const rst = { ...(r.restOverrides || {}) };
+          spec.forEach(([n, lo, hi, rr]) => { const id = N7(n); if (id) { rep[id] = [lo, hi]; rst[id] = rr; } });
+          return { ...r, repOverrides: rep, restOverrides: rst };
+        });
+        store.set("routines", rt);
+        packs = [...packs, "routines-andy-7"];
+      }
+      // repair: remove duplicate-id exercises (name variants that slugged to
+      // the same id across packs). Duplicate React keys corrupt the exercise
+      // picker after the first selection. References stay valid: the surviving
+      // entry keeps the same id.
+      const seenIds = new Set();
+      ex = ex.filter((e) => { if (seenIds.has(e.id)) return false; seenIds.add(e.id); return true; });
+      packsRef.current = packs;
       store.set("exercises", ex);
       store.set("packs", packs);
       setEx(ex); setRt(rt);
       setPrograms(await store.get("programs", []));
       setSess(await store.get("sessions", []));
-      setActive(await store.get("activeSession", null));
+      const act0 = await store.get("activeSession", null);
+      setActive(act0 && act0.entries ? { ...act0, entries: act0.entries.map((en0) => en0.id ? en0 : { ...en0, id: uid() }) } : act0);
       const s = await store.get("settings", {});
       if (s.unit) setUnit(s.unit); if (s.dist) setDist(s.dist); if (s.restDefault) setRestDefault(s.restDefault); if (s.activeProgramId !== undefined) setActiveProgramId(s.activeProgramId);
       setLoading(false);
     })();
   }, []);
 
-  // persistence wrappers
-  const saveEx = (n) => { setEx(n); store.set("exercises", n); };
-  const saveRt = (n) => { setRt(n); store.set("routines", n); };
-  const saveProg = (n) => { setPrograms(n); store.set("programs", n); };
-  const saveSess = (n) => { setSess(n); store.set("sessions", n); };
-  const saveActive = (n) => { setActive(n); store.set("activeSession", n); };
-  useEffect(() => { if (!loading) store.set("settings", { unit, dist, restDefault, activeProgramId }); }, [unit, dist, restDefault, activeProgramId, loading]);
+  // persistence wrappers — every write reports failure so "saved" is honest
+  const persist = (key, val) => store.set(key, val).then((ok) => { if (!ok) setSaveError(true); return ok; });
+  const saveEx = (n) => { setEx(n); return persist("exercises", n); };
+  const saveRt = (n) => { setRt(n); return persist("routines", n); };
+  const saveProg = (n) => { setPrograms(n); return persist("programs", n); };
+  const saveSess = (n) => { setSess(n); return persist("sessions", n); };
+  const saveActive = (n) => { setActive(n); return persist("activeSession", n); };
+  const settingsObj = () => ({ unit, dist, restDefault, activeProgramId });
+  useEffect(() => { if (!loading) persist("settings", settingsObj()); }, [unit, dist, restDefault, activeProgramId, loading]);
 
-  // rest timer engine
+  // rest timer engine — wall-clock anchored: iOS freezes JS timers when the
+  // app is backgrounded, so we store an end timestamp and derive the remainder.
+  // Returning to the app (visibility/focus) forces an immediate correct tick.
   useEffect(() => {
     if (!rest?.running) return;
-    const t = setInterval(() => {
-      setRest((r) => {
-        if (!r || !r.running) return r;
-        if (r.left <= 1) { beep(); return { ...r, left: 0, running: false }; }
-        return { ...r, left: r.left - 1 };
-      });
-    }, 1000);
-    return () => clearInterval(t);
+    const tick = () => setRest((r) => {
+      if (!r || !r.running) return r;
+      const left = Math.max(0, Math.ceil((r.endAt - Date.now()) / 1000));
+      if (left <= 0) { beep(); return { ...r, left: 0, running: false }; }
+      return left === r.left ? r : { ...r, left };
+    });
+    const t = setInterval(tick, 300);
+    const vis = () => tick();
+    document.addEventListener("visibilitychange", vis);
+    window.addEventListener("focus", vis);
+    tick();
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", vis); window.removeEventListener("focus", vis); };
   }, [rest?.running]);
-  const startRest = (sec) => setRest({ total: sec, left: sec, running: true });
+  const startRest = (sec) => setRest({ total: sec, left: sec, endAt: Date.now() + sec * 1000, running: true });
 
   /* ---- backup / restore ---- */
-  const buildBackup = () => ({
-    app: "iron-and-chalk", version: 2, exportedAt: Date.now(),
-    exercises, routines, programs, sessions, activeSession: active, settings: { unit, dist },
-  });
-  const saveNow = () => {
-    store.set("exercises", exercises); store.set("routines", routines); store.set("programs", programs);
-    store.set("sessions", sessions); store.set("activeSession", active);
-    store.set("settings", { unit, dist });
+  const ROUTINE_MIGRATIONS = ["routines-andy-2", "routines-andy-3", "routines-andy-4", "routines-andy-5", "routines-andy-6", "routines-andy-7", "units-stamp-1"];
+  const buildBackup = async () => {
+    const photos = {};
+    for (const sSess of sessions) {
+      if (sSess.hrPhoto) { const p = await store.get("hrphoto:" + sSess.id, null); if (p) photos[sSess.id] = p; }
+    }
+    return {
+      app: "iron-and-chalk", version: 3, exportedAt: Date.now(), appVersion: APP_VERSION,
+      exercises, routines, programs, sessions, activeSession: active,
+      settings: settingsObj(), packs: packsRef.current, photos,
+    };
   };
-  const restoreBackup = (obj) => {
-    if (!obj || typeof obj !== "object" || (!obj.exercises && !obj.sessions && !obj.routines))
-      throw new Error("This doesn't look like an Iron & Chalk backup.");
-    if (Array.isArray(obj.exercises)) saveEx(obj.exercises);
-    if (Array.isArray(obj.routines)) saveRt(obj.routines);
-    if (Array.isArray(obj.programs)) saveProg(obj.programs);
-    if (Array.isArray(obj.sessions)) saveSess(obj.sessions);
-    if (obj.activeSession !== undefined) saveActive(obj.activeSession);
-    if (obj.settings) { if (obj.settings.unit) setUnit(obj.settings.unit); if (obj.settings.dist) setDist(obj.settings.dist); }
+  const saveNow = () => {
+    persist("exercises", exercises); persist("routines", routines); persist("programs", programs);
+    persist("sessions", sessions); persist("activeSession", active);
+    persist("settings", settingsObj());
+  };
+  const validateBackup = (obj) => {
+    if (!obj || typeof obj !== "object") return "Not a backup object.";
+    if (!Array.isArray(obj.exercises) && !Array.isArray(obj.sessions) && !Array.isArray(obj.routines)) return "No recognisable backup data.";
+    for (const k of ["exercises", "routines", "programs", "sessions"]) {
+      if (obj[k] !== undefined && !Array.isArray(obj[k])) return k + " is not a list.";
+    }
+    for (const e of obj.exercises || []) { if (!e || typeof e.id !== "string" || typeof e.name !== "string") return "Malformed exercise record."; }
+    for (const r of obj.routines || []) { if (!r || typeof r.id !== "string" || !Array.isArray(r.exerciseIds || [])) return "Malformed workout record."; }
+    for (const p2 of obj.programs || []) { if (!p2 || typeof p2.id !== "string") return "Malformed routine record."; }
+    for (const ss of obj.sessions || []) { if (!ss || typeof ss.id !== "string" || (ss.entries !== undefined && !Array.isArray(ss.entries))) return "Malformed session record."; }
+    return null;
+  };
+  const restoreBackup = async (obj) => {
+    const err = validateBackup(obj);
+    if (err) throw new Error("Backup rejected: " + err);
+    // recovery snapshot of current state before touching anything
+    await store.set("backup:pre-restore", { at: Date.now(), exercises, routines, programs, sessions, activeSession: active, settings: settingsObj(), packs: packsRef.current });
+    const writes = [];
+    if (Array.isArray(obj.exercises)) { setEx(obj.exercises); writes.push(store.set("exercises", obj.exercises)); }
+    if (Array.isArray(obj.routines)) { setRt(obj.routines); writes.push(store.set("routines", obj.routines)); }
+    if (Array.isArray(obj.programs)) { setPrograms(obj.programs); writes.push(store.set("programs", obj.programs)); }
+    if (Array.isArray(obj.sessions)) { setSess(obj.sessions); writes.push(store.set("sessions", obj.sessions)); }
+    if (obj.activeSession !== undefined) { setActive(obj.activeSession); writes.push(store.set("activeSession", obj.activeSession)); }
+    if (obj.settings) {
+      if (obj.settings.unit) setUnit(obj.settings.unit);
+      if (obj.settings.dist) setDist(obj.settings.dist);
+      if (obj.settings.restDefault) setRestDefault(obj.settings.restDefault);
+      if (obj.settings.activeProgramId !== undefined) setActiveProgramId(obj.settings.activeProgramId);
+      writes.push(store.set("settings", { unit: obj.settings.unit || unit, dist: obj.settings.dist || dist, restDefault: obj.settings.restDefault || restDefault, activeProgramId: obj.settings.activeProgramId !== undefined ? obj.settings.activeProgramId : activeProgramId }));
+    }
+    // Older backups without migration flags: mark destructive routine
+    // migrations as applied so restore can't overwrite customised programmes;
+    // additive exercise packs re-apply harmlessly (name+id deduped).
+    const restoredPacks = Array.from(new Set([...(obj.packs || []), ...ROUTINE_MIGRATIONS]));
+    packsRef.current = restoredPacks;
+    writes.push(store.set("packs", restoredPacks));
+    if (obj.photos) { for (const [sid, dataUrl] of Object.entries(obj.photos)) writes.push(store.set("hrphoto:" + sid, dataUrl)); }
+    const results = await Promise.all(writes);
+    if (results.some((ok) => !ok)) { setSaveError(true); throw new Error("Restore data loaded, but some writes failed to persist — export a fresh backup and check storage space."); }
   };
   const backup = {
     build: buildBackup, saveNow, restore: restoreBackup,
@@ -1101,18 +1255,22 @@ export default function App() {
 
   /* ---- workout actions ---- */
   const startWorkout = (routine) => {
+    if (active && !window.confirm('A workout ("' + active.routineName + '") is already in progress. Discard it and start "' + routine.name + '"?')) return;
+    if (active) setRest(null);
     const entries = routine.exerciseIds
       .filter((id) => exById[id])
       .map((id) => {
         const ex = exById[id];
         const lastSess = sessions.find((s) => s.entries && s.entries.some((en) => en.exerciseId === id));
         const lastEntry = lastSess ? lastSess.entries.find((en) => en.exerciseId === id) : null;
-        return { exerciseId: id, sets: makeSets(ex, lastEntry, unit, routine.setOverrides && routine.setOverrides[id], routine.wuOverrides ? routine.wuOverrides[id] : undefined) };
+        const rx = resolvePrescription(routine, ex);
+        return { id: uid(), exerciseId: id, rx, sets: makeSets(ex, lastEntry, unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) };
       });
-    saveActive({ id: uid(), routineId: routine.id, routineName: routine.name, color: routine.color, plannedMin: routine.plannedMin, startedAt: Date.now(), entries });
+    saveActive({ id: uid(), routineId: routine.id, routineName: routine.name, color: routine.color, plannedMin: routine.plannedMin, startedAt: Date.now(), unit, dist, completionVersion: 2, entries });
     setTab("workout");
   };
   const addSession = (rec) => saveSess([rec, ...sessions].sort((a, b) => b.date - a.date));
+  const addSessionAwaited = (rec) => { const next = [rec, ...sessions].sort((x, y) => y.date - x.date); setSess(next); return persist("sessions", next); };
   const deleteSession = (id) => saveSess(sessions.filter((s) => s.id !== id));
   const quickLog = ({ date, type, name, minutes }) => {
     const t = workoutTypeById[type] || WORKOUT_TYPES[0];
@@ -1121,7 +1279,7 @@ export default function App() {
       color: t.color, durationSec: Math.round((minutes || 0) * 60), entries: [], quick: true,
     });
   };
-  const finishWorkout = (type, hrPhoto) => {
+  const finishWorkout = async (type, hrPhoto) => {
     if (!active) return;
     const entries = active.entries.map((en) => {
       const ex = exById[en.exerciseId];
@@ -1138,11 +1296,12 @@ export default function App() {
     }).filter(Boolean);
     if (entries.length) {
       if (hrPhoto) store.set(`hrphoto:${active.id}`, hrPhoto);
-      addSession({
+      const ok = await addSessionAwaited({
         id: active.id, date: Date.now(), routineName: active.routineName, routineId: active.routineId, type: type || "weights",
-        color: active.color, startedAt: active.startedAt, endedAt: Date.now(),
+        color: active.color, startedAt: active.startedAt, endedAt: Date.now(), unit, dist, completionVersion: 2,
         durationSec: Math.round((Date.now() - active.startedAt) / 1000), hrPhoto: !!hrPhoto, entries,
       });
+      if (!ok) { setSaveError(true); window.alert("Could not save this workout to history — your live session has been kept. Free up storage or export a backup, then finish again."); return; }
     }
     saveActive(null);
     setRest(null);
@@ -1162,19 +1321,24 @@ export default function App() {
       <style>{CSS}</style>
       <div className="wrap">
         {tab === "home" && (
-          <Dashboard {...{ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId }} />
+          <Dashboard {...{ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt }} />
         )}
         {tab === "routines" && (
           <Routines {...{ routines, programs, exercises, exById, active, saveRt, saveProg, startWorkout, setTab, backup, sessions, dist, restDefault, activeProgramId, setActiveProgramId }} />
         )}
         {tab === "workout" && (
-          <Workout {...{ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab }} />
+          <Workout {...{ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab, routines, saveRt, saveEx }} stopRest={() => setRest(null)} />
         )}
         {tab === "library" && (
           <LibraryView {...{ exercises, saveEx, routines }} />
         )}
         {tab === "calendar" && (
           <CalendarView {...{ sessions, quickLog, deleteSession }} />
+        )}
+        {saveError && (
+          <div className="card tight" style={{ background: "#FDE9E4", border: "1px solid var(--accent)", color: "var(--accent)", fontSize: 12.5, fontWeight: 700 }}>
+            A storage write failed — recent changes may not be saved. Export a backup from the Data card, then free up space and tap Save now. <button className="btn dark sm" style={{ marginLeft: 8 }} onClick={() => { saveNow(); setSaveError(false); }}>Retry save</button>
+          </div>
         )}
         {tab === "history" && (
           <HistoryView {...{ sessions, routines, programs, exById, dist }} />
@@ -1200,8 +1364,8 @@ export default function App() {
                 </div>
               </div>
               <div className="restbtns">
-                <button className="wide" onClick={() => setRest((r) => ({ ...r, left: r.left + 15, running: true }))}>+15</button>
-                <button onClick={() => setRest((r) => ({ ...r, running: !r.running }))}>
+                <button className="wide" onClick={() => setRest((r) => ({ ...r, left: r.left + 15, endAt: (r.running ? r.endAt : Date.now() + r.left * 1000) + 15000, running: true }))}>+15</button>
+                <button onClick={() => setRest((r) => r.running ? { ...r, running: false } : { ...r, running: true, endAt: Date.now() + r.left * 1000 })}>
                   {rest.running ? <Pause size={16} /> : <Play size={16} />}
                 </button>
                 <button onClick={() => setRest(null)}><X size={16} /></button>
@@ -1240,43 +1404,58 @@ function isCompound(ex) {
   if (ex && typeof ex.compound === "boolean") return ex.compound;
   return /(squat|deadlift|bench press|chest press|overhead press|shoulder press|military press|push press|barbell row|bent[- ]?over row|pendlay|t-bar row|seal row|romanian|rdl|hip thrust|glute bridge|pull[- ]?up|chin[- ]?up|weighted dip|^dip$|lunge|split squat|bulgarian|leg press|hack squat|power clean|clean|snatch|lat pulldown|pulldown|good morning|thruster|floor press|incline barbell press|incline dumbbell press|decline press|landmine press)/i.test((ex && ex.name) || "");
 }
+// Compound/isolation is its own property: explicit ex.mech wins, then the
+// movement-pattern mapping, then the legacy name regex. Pattern and mech are
+// related but deliberately separate (a straight-arm pulldown is a vertical
+// pull by pattern yet an isolation by mechanics).
+const PATTERN_COMPOUND = new Set(["horizontal-press", "incline-press", "decline-dip", "vertical-press", "vertical-pull", "row-lat", "row-upperback", "hinge", "squat", "lunge", "hip-thrust"]);
+function mechOf(ex) {
+  if (ex && ex.mech) return ex.mech;
+  const p = v2Pattern(ex);
+  if (p && p.indexOf("misc") !== 0) return PATTERN_COMPOUND.has(p) ? "compound" : "isolation";
+  return isCompound(ex) ? "compound" : "isolation";
+}
 function liftDefaults(ex) {
   if (ex && ex.scheme) return ex.scheme;
-  return isCompound(ex) ? { warmups: 2, work: 2, lo: 6, hi: 10 } : { warmups: 1, work: 3, lo: 10, hi: 15 };
+  return mechOf(ex) === "compound" ? { warmups: 2, work: 2, lo: 6, hi: 10 } : { warmups: 1, work: 3, lo: 10, hi: 15 };
 }
 function incFor(ex, unit) { const c = isCompound(ex); return unit === "lb" ? (c ? 5 : 2.5) : (c ? 2.5 : 1.25); }
-function makeSets(ex, lastEntry, unit, workCount, wuCount) {
+function makeSets(ex, lastEntry, unit, rx, lastMeta) {
   if (!ex || ex.category === "cardio") return [newSet()];
-  const d = liftDefaults(ex); const out = [];
+  const p9 = rx || liftDefaults(ex); const out = [];
+  const lu = (lastMeta && lastMeta.unit) || unit;
+  const cv = (lastMeta && lastMeta.cv) || 1;
   const lastW = lastEntry ? lastEntry.sets.filter((s) => s.warmup) : [];
-  const lastS = lastEntry ? lastEntry.sets.filter((s) => !s.warmup) : [];
-  const sugg = suggestWeight(ex, lastEntry, unit);
-  const nWu = (wuCount == null ? d.warmups : wuCount);
-  for (let i = 0; i < nWu; i++) {
+  const lastS = lastEntry ? lastEntry.sets.filter((s) => !s.warmup && isPerformedSet(s, cv)) : [];
+  // progression: increment only when every performed working set hit the top
+  const allHit = lastS.length > 0 && lastS.every((s) => (s.reps || 0) >= p9.hi);
+  const inc = allHit ? incFor(ex, unit) : 0;
+  const ghost = (p) => p && p.weight ? String(roundDisp(convW(p.weight, lu, unit) + 0)) : "";
+  for (let i = 0; i < (p9.warmups ?? 1); i++) {
     const p = lastW[i];
-    out.push(newSet({ warmup: true, phw: p && p.weight ? String(p.weight) : "", phr: p && p.reps ? String(p.reps) : "" }));
+    out.push(newSet({ warmup: true, phw: ghost(p), phr: p && p.reps ? String(p.reps) : "" }));
   }
-  const nWork = workCount || d.work;
-  for (let i = 0; i < nWork; i++) {
-    const p = lastS[i];
+  for (let i = 0; i < (p9.work ?? 3); i++) {
+    const p = lastS[i] || lastS[lastS.length - 1];
+    // per-set ghost preserves back-off structure; increment applies per set
+    const base = p && p.weight ? convW(p.weight, lu, unit) + inc : null;
     out.push(newSet({
-      target: `${d.lo}-${d.hi}`,
-      phw: sugg != null ? String(sugg) : (p && p.weight ? String(p.weight) : ""),
+      target: `${p9.lo}-${p9.hi}`,
+      phw: base != null ? String(roundDisp(base)) : "",
       phr: p && p.reps ? String(p.reps) : "",
     }));
   }
   return out;
 }
-function suggestWeight(ex, lastEntry, unit) {
+function suggestWeight(ex, lastEntry, unit, lastUnit, lastCv) {
   if (!lastEntry) return null;
-  const work = lastEntry.sets.filter((s) => !s.warmup);
-  const ws = work.length ? work : lastEntry.sets;
+  const ws = lastEntry.sets.filter((s) => !s.warmup && isPerformedSet(s, lastCv || 1));
   const weights = ws.map((s) => s.weight || 0).filter((w) => w > 0);
   if (!weights.length) return null;
-  const lastW = Math.max(...weights);
+  const lastW = convW(Math.max(...weights), lastUnit || unit, unit);
   const d = liftDefaults(ex);
   const allHit = ws.every((s) => (s.reps || 0) >= d.hi);
-  return allHit ? +(lastW + incFor(ex, unit)).toFixed(2) : lastW;
+  return roundDisp(allHit ? lastW + incFor(ex, unit) : lastW);
 }
 function compressImage(file, maxDim = 1000, quality = 0.72) {
   return new Promise((resolve, reject) => {
@@ -1342,7 +1521,7 @@ function MuscleTags({ ids, half }) {
 /* ============================================================
    DASHBOARD
    ============================================================ */
-function Dashboard({ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId }) {
+function Dashboard({ sessions, exercises, routines, programs, exById, active, unit, dist, setUnit, setDist, setTab, backup, activeProgramId, saveRt }) {
   const [loadMode, setLoadMode] = useState("sets"); // sets | volume
   const [openGroup, setOpenGroup] = useState(null);
   const [bmMetric, setBmMetric] = useState("sets");
@@ -1370,7 +1549,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
   const muscleLoad = useMemo(() => {
     const acc = Object.fromEntries(GROUPS.map((g) => [g.id, 0]));
     weekSess.forEach((s) => s.entries.forEach((en) => {
-      GROUPS.forEach((g) => { acc[g.id] += groupContribution(en, g, loadMode); });
+      GROUPS.forEach((g) => { acc[g.id] += groupContribution(en, g, loadMode, s.completionVersion); });
     }));
     return GROUPS.map((g) => ({ g, v: acc[g.id] })).sort((a, b) => b.v - a.v);
   }, [sessions, loadMode]);
@@ -1441,11 +1620,12 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
             </div>
             {last.entries.slice(0, 5).map((en, i) => {
               const best = en.sets.reduce((b, s) => (setVolume(s) > setVolume(b) ? s : b), en.sets[0]);
+              const bw = best.weight ? roundDisp(convW(best.weight, last.unit, unit)) : 0;
               return (
                 <div className="lrow" key={i}>
                   <div className="grow">
                     <div className="name">{en.name}</div>
-                    <div className="sub">{en.sets.length} sets{best.weight ? ` · top ${best.weight}${unit} × ${best.reps}` : best.timeSec ? ` · ${fmtTime(best.timeSec)}` : ""}</div>
+                    <div className="sub">{en.sets.length} sets{best.weight ? ` · top ${bw}${unit} × ${best.reps}` : best.timeSec ? ` · ${fmtTime(best.timeSec)}` : ""}</div>
                   </div>
                 </div>
               );
@@ -1503,19 +1683,32 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
             const archived = new Set((programs || []).filter((p) => p.archived).map((p) => p.id));
             const hasActive = activeProgramId && (programs || []).some((p) => p.id === activeProgramId);
             const scoped = hasActive ? routines.filter((r) => r.programId === activeProgramId) : routines.filter((r) => !archived.has(r.programId));
-            const sess = scoped.map((r) => (r.exerciseIds || []).map((id) => { const ex = exById[id]; return ex && ex.category !== "cardio" ? { ex, sets: (r.setOverrides && r.setOverrides[id]) || liftDefaults(ex).work } : null; }).filter(Boolean));
+            const sess = scoped.map((r) => (r.exerciseIds || []).map((id) => { const ex = exById[id]; return ex && ex.category !== "cardio" ? { ex, sets: resolvePrescription(r, ex).work } : null; }).filter(Boolean));
             return computeV2(sess, 1);
           }
           if (bmMetric !== "sets") return null;
-          const sess = sessions.filter((s) => within(s.date, bmDays)).map((s) => (s.entries || []).map((en) => { const ex = exById[en.exerciseId] || { name: en.name, category: en.category, primary: en.primary, secondary: en.secondary }; const nn = (en.sets || []).filter((st) => !st.warmup).length; return ex.category !== "cardio" && nn ? { ex, sets: nn } : null; }).filter(Boolean));
+          const sess = sessions.filter((s) => within(s.date, bmDays)).map((s) => (s.entries || []).map((en) => { const ex = exById[en.exerciseId] || { name: en.name, category: en.category, primary: en.primary, secondary: en.secondary }; const nn = (en.sets || []).filter((st) => !st.warmup && isPerformedSet(st, s.completionVersion)).length; return ex.category !== "cardio" && nn ? { ex, sets: nn } : null; }).filter(Boolean));
           return computeV2(sess, bmDays / 7);
         })(); return (<>
-        <BodyMap v2={v2data} items={(() => {
+        <BodyMap v2={v2data} exercises={exercises} scopeInfo={{ bmSource, bmDays }} edit={(() => {
+          if (bmSource !== "planned" || !activeProgramId) return null;
+          const activeRts = routines.filter((r) => r.programId === activeProgramId);
+          if (!activeRts.length) return null;
+          return {
+            workouts: activeRts.map((r) => ({ id: r.id, name: r.name, color: r.color, exerciseIds: r.exerciseIds || [] })),
+            remove: (rid, exId) => saveRt(routines.map((r) => r.id === rid ? { ...r, exerciseIds: (r.exerciseIds || []).filter((x) => x !== exId) } : r)),
+            add: (rid, exId) => saveRt(routines.map((r) => r.id === rid ? { ...r, exerciseIds: [...(r.exerciseIds || []), exId] } : r)),
+          };
+        })()} items={(() => {
           if (bmSource === "planned") {
             const seen = new Set(); const out = [];
-            routines.forEach((r) => (r.exerciseIds || []).forEach((id) => {
+            // same scoping as the Balance score: active programme, else non-archived
+            const archived2 = new Set((programs || []).filter((p) => p.archived).map((p) => p.id));
+            const hasActive2 = activeProgramId && (programs || []).some((p) => p.id === activeProgramId);
+            const scoped2 = hasActive2 ? routines.filter((r) => r.programId === activeProgramId) : routines.filter((r) => !archived2.has(r.programId));
+            scoped2.forEach((r) => (r.exerciseIds || []).forEach((id) => {
               const ex = exById[id]; if (!ex || ex.category === "cardio") return;
-              out.push({ name: ex.name, primary: ex.primary, secondary: ex.secondary, subMuscles: ex.subMuscles || [], weight: liftDefaults(ex).work });
+              out.push({ id: ex.id, name: ex.name, primary: ex.primary, secondary: ex.secondary, subMuscles: ex.subMuscles || [], routes: v2Routing(ex), weight: resolvePrescription(r, ex).work });
             }));
             return out;
           }
@@ -1535,8 +1728,9 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
             {bmSource === "planned" && <div className="vnrow mono">Scoring: {(activeProgramId && (programs || []).find((p) => p.id === activeProgramId)?.name) || "all routines (none active)"}</div>}
             <div className="vnrow mono">Delts — front {(v2data.weekly.delt_front || 0).toFixed(1)} · side {(v2data.weekly.delt_side || 0).toFixed(1)} · rear {(v2data.weekly.delt_rear || 0).toFixed(1)} est. sets · {v2data.shoulder.toLowerCase()}</div>
             {v2data.conc.map((m) => <div key={m} className="vnrow warn">High session concentration: {RAIL_LABELS[m] || m} over 10 routed sets in one session.</div>)}
-            {v2data.div.map(([k, c]) => <div key={k} className={"vnrow " + (c >= 4 ? "warn2" : "warn")}>{c} exercises share the {k.replace(/-/g, " ")} pattern this week — {c >= 4 ? "strong redundancy" : "possible redundancy"}.</div>)}
-            <div className="vnrow dim">Estimated effective sets: weekly hypertrophy stimulus from exercise involvement, effort and session distribution. Individual response may differ.</div>
+            {v2data.div.map(([k, c]) => <div key={k} className={"vnrow " + (c >= 4 ? "warn2" : "warn")}>{c} exercises share the {k.replace(/-/g, " ")} pattern {bmSource === "planned" || bmDays === 7 ? "this week" : "in the last 30 days"} — {c >= 4 ? "strong redundancy" : "possible redundancy"}.</div>)}
+            {v2data.directNotes.map((n) => <div key={n.m} className="vnrow warn">{RAIL_LABELS[n.m]}: in range mostly via indirect work ({n.d} direct sets/week) — add 1–2 direct sets if it's a priority muscle.</div>)}
+            <div className="vnrow dim">Estimated muscle-weighted sets: weekly stimulus estimated from exercise involvement and session distribution (set effort is not yet recorded). Reference ranges, not individual prescriptions.</div>
           </div>
         )}
         </>); })()}
@@ -1599,7 +1793,8 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
 function BackupSheet({ backup, flash, onClose }) {
   const fileRef = useRef(null);
   const [pasted, setPasted] = useState("");
-  const json = useMemo(() => JSON.stringify(backup.build(), null, 2), []);
+  const [json, setJson] = useState("");
+  useEffect(() => { let on = true; Promise.resolve(backup.build()).then((o) => { if (on) setJson(JSON.stringify(o, null, 2)); }); return () => { on = false; }; }, []);
 
   const download = () => {
     try {
@@ -1614,11 +1809,11 @@ function BackupSheet({ backup, flash, onClose }) {
     } catch { flash("Download blocked — copy the text instead"); }
   };
 
-  const restore = (text) => {
+  const restore = async (text) => {
     let obj;
     try { obj = JSON.parse(text); } catch { flash("That's not valid backup text"); return; }
     if (!window.confirm("Restore this backup? It replaces your current exercises, routines and history.")) return;
-    try { backup.restore(obj); flash("Backup restored"); onClose(); }
+    try { await backup.restore(obj); flash("Backup restored ✓"); onClose(); }
     catch (e) { flash(e.message || "Couldn't restore backup"); }
   };
 
@@ -1678,7 +1873,7 @@ function MuscleDetail({ group, sessions, exById, unit, onClose }) {
     sessions.forEach((s) => {
       const b = buckets.find((x) => s.date >= x.start && s.date < x.end);
       if (!b) return;
-      s.entries.forEach((en) => { b.value += groupContribution(en, group, metric); });
+      s.entries.forEach((en) => { b.value += groupContribution(en, group, metric, s.completionVersion); });
     });
     return buckets;
   }, [sessions, group, period, metric]);
@@ -1693,7 +1888,7 @@ function MuscleDetail({ group, sessions, exById, unit, onClose }) {
     const acc = {};
     sessions.filter((s) => cur && s.date >= cur.start && s.date < cur.end).forEach((s) =>
       s.entries.forEach((en) => {
-        const v = groupContribution(en, group, metric);
+        const v = groupContribution(en, group, metric, s.completionVersion);
         if (v > 0) acc[en.exerciseId] = (acc[en.exerciseId] || 0) + v;
       }));
     return Object.entries(acc).map(([id, v]) => ({ id, v, name: exById[id]?.name || id }))
@@ -1814,29 +2009,51 @@ function Sparkline({ pts }) {
    ============================================================ */
 function mName(id) { return (muscleById[id] && muscleById[id].name) || (id ? id[0].toUpperCase() + id.slice(1).replace(/_/g, " ") : ""); }
 // Estimated workout time: per-set execution + rest, plus setup per exercise.
+// THE prescription authority: workout-level overrides > per-exercise scheme >
+// pattern defaults. Nullish checks so an explicit 0 (e.g. zero warm-ups) holds.
+function resolvePrescription(routine, ex) {
+  const d = liftDefaults(ex);
+  const id = ex && ex.id;
+  const ov = (o) => (routine && o && id != null && o[id] !== undefined) ? o[id] : undefined;
+  const work = ov(routine && routine.setOverrides);
+  const wu = ov(routine && routine.wuOverrides);
+  const reps = ov(routine && routine.repOverrides);
+  const rest = ov(routine && routine.restOverrides);
+  return {
+    warmups: wu ?? d.warmups,
+    work: work ?? d.work,
+    lo: (reps && reps[0]) ?? d.lo,
+    hi: (reps && reps[1]) ?? d.hi,
+    rest: rest ?? null,
+  };
+}
 function estimateMin(routine, exById, restSec = 90) {
   let sec = 0;
   (routine.exerciseIds || []).forEach((id) => {
     const ex = exById[id]; if (!ex) return;
     if (ex.category === "cardio") { sec += 10 * 60; return; }
-    const d = liftDefaults(ex);
-    const nw = (routine.setOverrides && routine.setOverrides[id]) || d.work;
-    const wu = (routine.wuOverrides && routine.wuOverrides[id] != null) ? routine.wuOverrides[id] : d.warmups;
-    sec += wu * (30 + Math.min(60, restSec * 0.6));
-    sec += nw * (40 + restSec);
+    const rx = resolvePrescription(routine, ex);
+    const rr = rx.rest ?? restSec;
+    sec += rx.warmups * (30 + Math.min(60, rr * 0.6));
+    sec += rx.work * (40 + rr);
     sec += 75; // setup / transition
   });
   return Math.max(5, Math.round(sec / 60 / 5) * 5);
 }
+function rxText(routine, ex) {
+  if (ex.category === "cardio") return "cardio";
+  const rx = resolvePrescription(routine, ex);
+  return `${rx.warmups} warm-up + ${rx.work} working sets × ${rx.lo}-${rx.hi} reps${rx.rest ? ` · rest ${rx.rest}s` : ""} [${mechOf(ex) === "compound" ? "compound" : "isolation"}]`;
+}
 function schemeText(ex) {
   if (ex.category === "cardio") return "cardio";
   const d = liftDefaults(ex);
-  return `${d.warmups} warm-up + ${d.work} working sets × ${d.lo}-${d.hi} reps [${isCompound(ex) ? "compound" : "isolation"}]`;
+  return `${d.warmups} warm-up + ${d.work} working sets × ${d.lo}-${d.hi} reps [${mechOf(ex) === "compound" ? "compound" : "isolation"}]`;
 }
 function exportExLine(ex) {
   const prim = (ex.primary || []).map(mName).join(", ");
   const sec = (ex.secondary || []).length ? ` (+${(ex.secondary || []).map(mName).join(", ")})` : "";
-  return `- ${ex.name} — ${prim}${sec} — ${schemeText(ex)}`;
+  return `- ${ex.name} — ${prim}${sec} — ${rxText(routine, ex)}`;
 }
 function fmtSetLog(s, dist) {
   if (s.weight > 0 && s.reps > 0) return `${s.weight}×${s.reps}${s.warmup ? "(W)" : ""}`;
@@ -1991,7 +2208,14 @@ function Routines({ routines, programs, exercises, exById, active, saveRt, saveP
           <Accordion key={p.id} id={p.id} color={p.color} name={p.name} meta={meta} items={items} onAddProgramId={p.id}
             onCopyAll={() => copyExport(buildRoutineExport(p, routines, exById, sessions, dist, restDefault))}
             badge={p.id === activeProgramId ? "Active" : p.archived ? "Archived" : null}
-            actions={<button className="iconbtn" style={{ border: "none", background: "none", alignSelf: "center", marginRight: 4 }} onClick={() => setOpenProg(p)} title="Details & history"><Activity size={16} /></button>} />
+            actions={<>
+              <button className={"activetoggle" + (p.id === activeProgramId ? " on" : "")}
+                title={p.id === activeProgramId ? "Active — tap to deactivate" : "Set as active routine"}
+                onClick={() => { const on = p.id !== activeProgramId; setActiveProgramId(on ? p.id : null); flash(on ? "Active routine: " + p.name : "No active routine — scoring all"); }}>
+                <CheckCircle2 size={16} />
+              </button>
+              <button className="iconbtn" style={{ border: "none", background: "none", alignSelf: "center", marginRight: 4 }} onClick={() => setOpenProg(p)} title="Details & history"><Activity size={16} /></button>
+            </>} />
         );
       })}
 
@@ -2383,7 +2607,7 @@ function RoutineEditor({ routine, exercises, onSave, onClose }) {
 /* ============================================================
    WORKOUT
    ============================================================ */
-function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab }) {
+function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, startRest, restDefault, setRestDefault, finishWorkout, setTab, routines, saveRt, saveEx, stopRest }) {
   const [elapsed, setElapsed] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -2392,6 +2616,13 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   const [hrPhoto, setHrPhoto] = useState(null);
   const [hrBusy, setHrBusy] = useState(false);
   const hrRef = useRef(null);
+  const [exMenu, setExMenu] = useState(null);       // entry index for per-exercise menu
+  const [skipped, setSkipped] = useState(null);     // { entry, index } undo buffer
+  const [pendingAdd, setPendingAdd] = useState(null); // exercise awaiting session/permanent choice
+  const [reordering, setReordering] = useState(false);
+  const [orderDirty, setOrderDirty] = useState(false);
+  const [creating, setCreating] = useState(false);  // new-exercise editor
+  useEffect(() => { if (!skipped) return; const t = setTimeout(() => setSkipped(null), 8000); return () => clearTimeout(t); }, [skipped]);
 
   useEffect(() => {
     if (!active) return;
@@ -2422,10 +2653,8 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     const ex = exById[en.exerciseId];
     const oldSet = en.sets.find((s) => s.id === setId);
     const ns = { ...oldSet, [field]: value };
-    const fire = isComplete(ex, ns) && !isComplete(ex, oldSet);
     const entries = active.entries.map((e, i) => i !== entryIdx ? e : { ...e, sets: e.sets.map((s) => s.id === setId ? ns : s) });
     saveActive({ ...active, entries });
-    if (fire) startRest(restDefault);
   };
   const toggleDone = (entryIdx, setId) => {
     const en = active.entries[entryIdx];
@@ -2436,7 +2665,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     });
     saveActive({ ...active, entries });
     setCollapse((c) => { const n = { ...c }; delete n[en.exerciseId]; return n; });
-    if (!wasDone && !isComplete(ex, s0)) startRest(restDefault);
+    if (!wasDone) startRest((en.rx && en.rx.rest) || restDefault); // rest starts on the explicit tick only
   };
   const addSet = (entryIdx) => {
     const ex = exById[active.entries[entryIdx].exerciseId]; const d = liftDefaults(ex);
@@ -2458,7 +2687,48 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     saveActive({ ...active, entries });
   };
   const removeExercise = (entryIdx) => saveActive({ ...active, entries: active.entries.filter((_, i) => i !== entryIdx) });
-  const addExercise = (id) => { const ex = exById[id]; saveActive({ ...active, entries: [...active.entries, { exerciseId: id, sets: makeSets(ex, lastFor(id), unit) }] }); setAdding(false); };
+  const doAdd = (ex, permanent) => {
+    const rtn = routines.find((r) => r.id === active.routineId);
+    const rx = resolvePrescription(rtn, ex);
+    const lastSess = sessions.find((s9) => s9.entries && s9.entries.some((en9) => en9.exerciseId === ex.id));
+    saveActive({ ...active, entries: [...active.entries, { id: uid(), exerciseId: ex.id, rx, sets: makeSets(ex, lastFor(ex.id), unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) }] });
+    if (permanent && rtn && !(rtn.exerciseIds || []).includes(ex.id)) {
+      saveRt(routines.map((r) => r.id === rtn.id ? { ...r, exerciseIds: [...(r.exerciseIds || []), ex.id] } : r));
+    }
+    setPendingAdd(null); setAdding(false);
+  };
+  const addExercise = (id) => {
+    const ex = exById[id]; if (!ex) return;
+    const rtn = routines.find((r) => r.id === active.routineId);
+    if (rtn && !(rtn.exerciseIds || []).includes(id)) { setAdding(false); setPendingAdd(ex); }
+    else doAdd(ex, false);
+  };
+  const createExercise = (draft) => {
+    const built = { ...draft, id: uid() };
+    saveEx([...exercises, built]);
+    setCreating(false);
+    const rtn = routines.find((r) => r.id === active.routineId);
+    if (rtn) setPendingAdd(built); else doAdd(built, false);
+  };
+  const undoSkip = () => {
+    if (!skipped) return;
+    const entries = [...active.entries];
+    entries.splice(Math.min(skipped.index, entries.length), 0, skipped.entry);
+    saveActive({ ...active, entries }); setSkipped(null);
+  };
+  const applyReorder = (ids) => {
+    const by = {}; active.entries.forEach((e) => { by[e.id || e.exerciseId] = e; });
+    saveActive({ ...active, entries: ids.map((x) => by[x]).filter(Boolean) });
+    setOrderDirty(true);
+  };
+  const saveOrderToWorkout = () => {
+    const rtn = routines.find((r) => r.id === active.routineId);
+    if (!rtn) { setReordering(false); return; }
+    const sessOrder = active.entries.map((e) => e.exerciseId).filter((x) => (rtn.exerciseIds || []).includes(x));
+    const leftover = (rtn.exerciseIds || []).filter((x) => !sessOrder.includes(x));
+    saveRt(routines.map((r) => r.id === rtn.id ? { ...r, exerciseIds: [...sessOrder, ...leftover] } : r));
+    setReordering(false); setOrderDirty(false);
+  };
 
   const lastFor = (exId) => {
     for (const s of sessions) { const e = s.entries.find((x) => x.exerciseId === exId); if (e) return e; }
@@ -2485,8 +2755,15 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
             <button key={s} className={`mono ${restDefault === s ? "on" : ""}`} onClick={() => setRestDefault(s)}>{s}</button>
           ))}
         </div>
+        <button className="iconbtn" title="Reorder exercises" onClick={() => setReordering(true)}><GripVertical size={16} /></button>
       </div>
       <p className="muted" style={{ fontSize: 11, margin: "-4px 2px 12px" }}>Timer auto-starts when you log a set's {TRACKING[exById[active.entries[0]?.exerciseId]?.trackingType]?.fields.join(" & ") || "reps"}.</p>
+      {skipped && (
+        <div className="card tight" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface2)" }}>
+          <span style={{ flex: 1, fontSize: 12.5 }}>Skipped <b>{exById[skipped.entry.exerciseId]?.name || "exercise"}</b> for today.</span>
+          <button className="btn dark sm" onClick={undoSkip}><RotateCcw size={13} /> Undo</button>
+        </div>
+      )}
 
       {active.entries.map((en, ei) => {
         const ex = exById[en.exerciseId]; if (!ex) return null;
@@ -2535,7 +2812,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                     <ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} />
                   </button>
                 )}
-                <button className="iconbtn" onClick={() => removeExercise(ei)}><Trash2 size={15} /></button>
+                <button className="iconbtn" onClick={() => setExMenu(ei)}><Trash2 size={15} /></button>
               </div>
             </div>
             <div className="setgrid">
@@ -2559,8 +2836,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                         {fields.map((f) => (
                           <input key={f} className="inp" inputMode={f === "time" ? "text" : "decimal"}
                             value={s[f]} placeholder={f === "weight" && s.phw ? s.phw : f === "reps" ? (s.phr || (!s.warmup && s.target) || "0") : f === "time" ? "0:00" : "0"}
-                            onChange={(e) => update(ei, s.id, f, e.target.value)}
-                            onDoubleClick={() => removeSet(ei, s.id)} />
+                            onChange={(e) => update(ei, s.id, f, e.target.value)} />
                         ))}
                         <button className={`ck ${s.done ? "on" : ""}`} onClick={() => toggleDone(ei, s.id)}><Check size={18} /></button>
                         <button className="setdel" aria-label="Delete set" onClick={() => removeSet(ei, s.id)}><X size={15} /></button>
@@ -2585,11 +2861,53 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
       <button className="btn ghost" onClick={() => setAdding(true)}><Plus size={16} /> Add exercise</button>
       <div style={{ height: 12 }} />
       <button className="btn acc" onClick={() => setConfirm(true)}><Check size={17} /> Finish workout</button>
-      <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => { if (window.confirm("Discard this workout? Nothing will be saved.")) { saveActive(null); setTab("home"); } }}>Discard</button>
+      <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => { if (window.confirm("Discard this workout? Nothing will be saved.")) { saveActive(null); stopRest && stopRest(); setTab("home"); } }}>Discard</button>
 
       {adding && (
-        <PickExercise exercises={exercises} exclude={active.entries.map((e) => e.exerciseId)} onPick={addExercise} onClose={() => setAdding(false)} />
+        <PickExercise exercises={exercises} exclude={active.entries.map((e) => e.exerciseId)} onPick={addExercise} onCreate={() => { setAdding(false); setCreating(true); }} onClose={() => setAdding(false)} />
       )}
+      {creating && <ExerciseEditor exercise={{}} onSave={createExercise} onClose={() => setCreating(false)} />}
+      {exMenu != null && active.entries[exMenu] && (() => { const en = active.entries[exMenu]; const nm = exById[en.exerciseId]?.name || "Exercise"; return (
+        <div className="scrim" onClick={() => setExMenu(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 24 }}>
+            <div className="sheeth"><div className="tt">{nm}</div><button className="iconbtn" onClick={() => setExMenu(null)}><X size={18} /></button></div>
+            <button className="btn ghost" style={{ width: "100%", marginBottom: 10 }} onClick={() => {
+              const done = en.sets.filter((s2) => s2.done);
+              if (done.length) {
+                // keep completed work; drop only the remaining sets
+                const entries = active.entries.map((e2, i2) => i2 === exMenu ? { ...e2, sets: done, skippedRest: true } : e2);
+                saveActive({ ...active, entries });
+              } else {
+                setSkipped({ entry: en, index: exMenu });
+                removeExercise(exMenu);
+              }
+              setExMenu(null);
+            }}>
+              Skip today — injury, machine busy, out of time
+            </button>
+            <p className="muted" style={{ fontSize: 11 }}>Sets you already completed are kept; only the remaining sets are removed, and this session only (undo available briefly if nothing was completed). The workout template is unchanged.</p>
+          </div>
+        </div>
+      ); })()}
+      {pendingAdd && (() => { const rtn = routines.find((r) => r.id === active.routineId); return (
+        <div className="scrim" onClick={() => setPendingAdd(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 24 }}>
+            <div className="sheeth"><div className="tt">Add {pendingAdd.name}</div><button className="iconbtn" onClick={() => setPendingAdd(null)}><X size={18} /></button></div>
+            <button className="btn dark" style={{ width: "100%", marginBottom: 8 }} onClick={() => doAdd(pendingAdd, false)}>This session only</button>
+            {rtn && <button className="btn acc" style={{ width: "100%" }} onClick={() => doAdd(pendingAdd, true)}><Save size={15} /> Add to {rtn.name} permanently</button>}
+          </div>
+        </div>
+      ); })()}
+      {reordering && (() => { const rtn = routines.find((r) => r.id === active.routineId); return (
+        <div className="scrim" onClick={() => setReordering(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 24 }}>
+            <div className="sheeth"><div className="tt">Reorder exercises</div><button className="iconbtn" onClick={() => setReordering(false)}><X size={18} /></button></div>
+            <ReorderList items={active.entries.map((en) => { const ex2 = exById[en.exerciseId]; return { id: en.id || en.exerciseId, name: ex2 ? ex2.name : "Exercise", sub: `${en.sets.filter((s2) => s2.done).length}/${en.sets.length} sets done` }; })} onReorder={applyReorder} />
+            <button className="btn dark" style={{ width: "100%", marginTop: 12 }} onClick={() => { setReordering(false); setOrderDirty(false); }}>This session only</button>
+            {rtn && <button className="btn acc" style={{ width: "100%", marginTop: 8 }} disabled={!orderDirty} onClick={saveOrderToWorkout}><Save size={15} /> Save order to {rtn.name}</button>}
+          </div>
+        </div>
+      ); })()}
       {confirm && (() => {
         const derived = active.entries.length && active.entries.every((en) => exById[en.exerciseId]?.category === "cardio") ? "cardio" : "weights";
         const chosen = wType || derived;
@@ -2643,9 +2961,11 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   );
 }
 
-function PickExercise({ exercises, exclude, onPick, onClose }) {
+function PickExercise({ exercises, exclude, onPick, onCreate, onClose }) {
   const [q, setQ] = useState("");
-  const list = exercises.filter((e) => !exclude.includes(e.id) && e.name.toLowerCase().includes(q.toLowerCase()));
+  const list = exercises
+    .filter((e) => !exclude.includes(e.id) && e.name.toLowerCase().includes(q.toLowerCase()))
+    .sort((a2, b2) => a2.name.localeCompare(b2.name));
   return (
     <div className="scrim" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -2654,6 +2974,7 @@ function PickExercise({ exercises, exclude, onPick, onClose }) {
           <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)" }} />
           <input className="tin" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search library" />
         </div>
+        {onCreate && <button className="btn ghost" style={{ width: "100%", marginBottom: 10 }} onClick={onCreate}><Plus size={15} /> Create new exercise</button>}
         {list.map((e) => (
           <button key={e.id} onClick={() => onPick(e.id)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", padding: 12, marginBottom: 6, borderRadius: 11, background: "var(--surface)", border: "1px solid var(--line)" }}>
             <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{e.name}</div>
@@ -3170,7 +3491,7 @@ const RAILS = {
 };
 const RAIL_LABELS = { chest: "Chest", lats: "Lats", upper_back: "Upper back", delt_front: "Front delt", delt_side: "Side delt", delt_rear: "Rear delt", biceps: "Biceps", triceps: "Triceps", forearms: "Forearms", quads: "Quads", hamstrings: "Hamstrings", glutes: "Glutes", calves: "Calves", core: "Abs / core" };
 // visible map group -> rail key (shoulders handled per-head)
-const V2_GROUP_KEY = { chest: "chest", biceps: "biceps", triceps: "triceps", forearms: "forearms", abs: "core", obliques: "core", traps: "upper_back", lats: "lats", quads: "quads", tibialis: "calves", glutes: "glutes", hamstrings: "hamstrings", calves: "calves" };
+const V2_GROUP_KEY = { chest: "chest", biceps: "biceps", triceps: "triceps", forearms: "forearms", abs: "core", obliques: "core", traps: "upper_back", lats: "lats", quads: "quads", glutes: "glutes", hamstrings: "hamstrings", calves: "calves" }; // tibialis unmapped: no dorsiflexion work is modelled, so it stays unlit
 
 // Exercise -> [[railKey, weight], ...]. Name-based classifier with the old
 // primary/secondary model as fallback so every exercise routes somewhere.
@@ -3193,27 +3514,29 @@ function v2Routing(ex) {
   if (has("pullover")) return [["chest", 0.5], ["lats", 0.5]];
   if (has("incline") && has("press", "push-up", "push up")) return [["chest", 1], ["delt_front", 0.5], ["triceps", 0.5]];
   if (has("decline") && has("press")) return [["chest", 1], ["triceps", 0.5], ["delt_front", 0.25]];
+  if (has("close grip bench", "close-grip bench", "diamond push")) return [["chest", 0.75], ["triceps", 0.75], ["delt_front", 0.5]];
   if (has("bench press", "chest press", "floor press", "push-up", "push up", "landmine press", "svend")) return [["chest", 1], ["triceps", 0.5], ["delt_front", 0.5]];
+  if (has("straight arm")) return [["lats", 1]];
   if (has("chin-up", "chin up", "chinup")) return F([["lats", 1], ["biceps", 0.75], ["upper_back", 0.25], ["forearms", straps ? 0 : 0.25]]);
   if (has("pulldown", "pull-up", "pull up", "pullup")) return F([["lats", 1], ["biceps", 0.5], ["upper_back", 0.25], ["forearms", straps ? 0 : 0.25]]);
-  if (has("straight arm")) return [["lats", 1]];
   if (has("row") && !has("upright")) {
     const latBias = has("single arm", "one arm", "close grip", "neutral grip", "kroc", "meadows", "cable row") && !has("wide");
     const base = latBias ? [["lats", 1], ["upper_back", 0.5]] : [["upper_back", 1], ["lats", 0.5]];
     return F([...base, ["biceps", 0.5], ["delt_rear", 0.25], ["forearms", straps ? 0 : 0.25]]);
   }
   if (has("rack pull")) return F([["upper_back", 0.75], ["hamstrings", 0.5], ["glutes", 0.5], ["forearms", straps ? 0 : 0.25]]);
-  if (has("romanian", "rdl", "stiff leg", "stiff-leg", "good morning")) return F([["hamstrings", 1], ["glutes", 0.5], ["forearms", straps ? 0 : 0.25]]);
+  if (has("good morning")) return [["hamstrings", 1], ["glutes", 0.5]]; // bar on back: no grip credit
+  if (has("romanian", "rdl", "stiff leg", "stiff-leg")) return F([["hamstrings", 1], ["glutes", 0.5], ["forearms", straps ? 0 : 0.25]]);
   if (has("hip thrust", "glute bridge", "frog pump")) return [["glutes", 1], ["quads", 0.25], ["hamstrings", 0.25]];
   if (has("deadlift")) return F([["hamstrings", 1], ["glutes", 0.5], ["upper_back", 0.25], ["forearms", straps ? 0 : 0.25]]);
   if (has("abduction")) return [["glutes", 1]];
   if (has("kickback") && (ex.primary || []).includes("glutes")) return [["glutes", 1]];
+  if (has("calf")) return [["calves", 1]]; // before squat: "Leg Press Calf Raise"
   if (has("leg extension", "sissy")) return [["quads", 1]];
   if (has("lunge", "split squat", "step-up", "step up")) return [["quads", 1], ["glutes", 0.5]];
   if (has("squat", "leg press")) return [["quads", 1], ["glutes", 0.5]];
   if (has("nordic", "glute ham")) return [["hamstrings", 1]];
   if (has("leg curl")) return [["hamstrings", 1]];
-  if (has("calf")) return [["calves", 1]];
   if (has("reverse curl", "reverse wrist")) return has("wrist") ? [["forearms", 1]] : [["forearms", 0.75], ["biceps", 0.25]];
   if (has("wrist curl", "pinch", "farmer")) return [["forearms", 1]];
   if (has("hammer curl", "zottman")) return [["biceps", 1], ["forearms", 0.5]];
@@ -3244,19 +3567,20 @@ function v2Pattern(ex) {
   if (has("incline") && has("press", "push")) return "incline-press";
   if (has("decline") && has("press")) return "decline-dip";
   if (has("bench press", "chest press", "floor press", "push-up", "push up")) return "horizontal-press";
+  if (has("straight arm")) return "straight-arm-pullover";
   if (has("chin-up", "chin up", "chinup", "pulldown", "pull-up", "pull up", "pullup")) return "vertical-pull";
   if (has("row") && !has("upright")) return (has("single arm", "one arm", "close grip", "neutral grip", "kroc", "meadows", "cable row") && !has("wide")) ? "row-lat" : "row-upperback";
   if (has("shrug", "upright row")) return "shrug";
   if (has("romanian", "rdl", "stiff", "good morning", "deadlift", "rack pull")) return "hinge";
   if (has("hip thrust", "glute bridge", "frog")) return "hip-thrust";
+  if (has("seated calf")) return "calf-seated";
+  if (has("calf")) return "calf-standing";
   if (has("lunge", "split squat", "step")) return "lunge";
   if (has("squat", "leg press")) return "squat";
   if (has("leg extension", "sissy")) return "knee-ext";
   if (has("seated leg curl")) return "kneeflex-seated";
   if (has("leg curl")) return "kneeflex-lying";
   if (has("nordic", "glute ham")) return "nordic";
-  if (has("seated calf")) return "calf-seated";
-  if (has("calf")) return "calf-standing";
   if (has("wrist", "pinch", "farmer")) return "forearm";
   if (has("reverse curl")) return "curl-pronated";
   if (has("hammer", "zottman")) return "curl-neutral";
@@ -3274,7 +3598,7 @@ function v2Pattern(ex) {
 // sessionsList = array of sessions; each session = ordered [{ex, sets}]
 // weeks scales to a weekly figure (planned = 1; actual = days/7).
 function computeV2(sessionsList, weeks) {
-  const weekly = {}; const conc = new Set(); const patSlots = {};
+  const weekly = {}; const direct = {}; const conc = new Set(); const patSlots = {};
   sessionsList.forEach((exList) => {
     const counters = {};
     exList.forEach(({ ex, sets }) => {
@@ -3287,13 +3611,17 @@ function computeV2(sessionsList, weeks) {
           const pos = counters[m] || 0; // routed-set equivalents BEFORE this set
           const f = pos < 5 ? 1 : pos < 8 ? 0.9 : pos < 12 ? 0.75 : 0.5;
           weekly[m] = (weekly[m] || 0) + w * f;
+          if (w >= 0.75) direct[m] = (direct[m] || 0) + 1;
           counters[m] = pos + w;
         });
       }
     });
     Object.entries(counters).forEach(([m, c]) => { if (c > 10) conc.add(m); });
   });
-  if (weeks && weeks !== 1) Object.keys(weekly).forEach((m) => { weekly[m] = weekly[m] / weeks; });
+  if (weeks && weeks !== 1) {
+    Object.keys(weekly).forEach((m) => { weekly[m] = weekly[m] / weeks; });
+    Object.keys(direct).forEach((m) => { direct[m] = direct[m] / weeks; });
+  }
   const status = {};
   Object.entries(RAILS).forEach(([m, [lo, hi]]) => {
     const v = weekly[m] || 0;
@@ -3303,7 +3631,14 @@ function computeV2(sessionsList, weeks) {
   const shoulder = (hs.includes("over") && hs.includes("under")) ? "MIXED"
     : hs.includes("over") ? "HIGH" : hs.includes("under") ? "LOW" : "BALANCED";
   const div = Object.entries(patSlots).filter(([k, c]) => c >= 3 && k.indexOf("misc") !== 0);
-  return { weekly, status, shoulder, conc: Array.from(conc), div };
+  // Direct-work check: isolation-responsive muscles that sit inside the rail
+  // mostly on 0.5x indirect credit get an advisory — effective volume is a
+  // population estimate and indirect stimulus is its least certain component.
+  const DIRECT_MIN = { biceps: 4, triceps: 4, delt_side: 4, calves: 4 };
+  const directNotes = Object.entries(DIRECT_MIN)
+    .filter(([m, min]) => status[m] === "ok" && (direct[m] || 0) < min)
+    .map(([m, min]) => ({ m, d: Math.round((direct[m] || 0) * 10) / 10, min }));
+  return { weekly, direct, status, shoulder, conc: Array.from(conc), div, directNotes };
 }
 
 // One SVG path per visible region (left `d`; paired regions mirror about x=236 -> 472-x).
@@ -3441,7 +3776,7 @@ function BodyView({ img, view, vb, overlays, colorForGroup, selected, onPick, de
   );
 }
 
-function BodyMap({ items, v2 }) {
+function BodyMap({ items, v2, edit, exercises }) {
   const [open, setOpen] = useState(null);
   const [mode, setMode] = useState("balance");
   const [debug, setDebug] = useState(false);
@@ -3489,7 +3824,7 @@ function BodyMap({ items, v2 }) {
       </div>
       {mode === "balance" ? (
         <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 8, flexWrap: "wrap" }}>
-          {[["Under", "var(--balance-under)"], ["Balanced", "var(--balance-balanced)"], ["Over", "var(--balance-over)"]].map(([t, c]) => (
+          {[["Under", "var(--balance-under)"], ["In range", "var(--balance-balanced)"], ["Over", "var(--balance-over)"]].map(([t, c]) => (
             <span key={t} className="mono" style={{ fontSize: 10, color: "var(--ink2)", display: "inline-flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 9, height: 9, borderRadius: 999, background: c }} />{t}
             </span>
@@ -3502,28 +3837,67 @@ function BodyMap({ items, v2 }) {
           <span className="mono" style={{ fontSize: 10, color: "var(--ink2)" }}>High</span>
         </div>
       )}
-      <p className="muted" style={{ fontSize: 11, marginTop: 8, textAlign: "center" }}>{debug ? "Tracer on — hover for path id + SVG coordinates." : (v2 && mode === "balance") ? "Estimated effective sets vs weekly rails — green in range, blue under, red over, amber mixed delt heads. Tap for detail." : "Tap a muscle for its heads and exercises."}</p>
-      {open && <MuscleZoom muscle={open} heat={heat} colorFor={fineColorFor} items={items} onClose={close} />}
+      <p className="muted" style={{ fontSize: 11, marginTop: 8, textAlign: "center" }}>{debug ? "Tracer on — hover for path id + SVG coordinates." : (v2 && mode === "balance") ? "Estimated muscle-weighted sets vs weekly reference ranges — green in range, blue under, red over, amber mixed delt heads. Tap for detail." : "Tap a muscle for its heads and exercises."}</p>
+      {open && <MuscleZoom muscle={open} heat={heat} colorFor={fineColorFor} items={items} edit={edit} exercises={exercises} v2={v2} onClose={close} />}
     </>
   );
 }
 
-function MuscleZoom({ muscle, heat, colorFor, items, onClose }) {
+function MuscleZoom({ muscle, heat, colorFor, items, edit, exercises, v2, onClose }) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQ, setAddQ] = useState("");
+  const [pickFor, setPickFor] = useState(null); // exercise id awaiting workout choice
   const info = MUSCLE_INFO[muscle];
   if (!info) return null;
+  const routeKeys0 = muscle === "shoulders" ? ["delt_front", "delt_side", "delt_rear"] : (info.muscleIds || []);
+  const inWorkouts = (exId) => edit ? edit.workouts.filter((w) => w.exerciseIds.includes(exId)) : [];
+  const candidates = edit && exercises ? exercises
+    .filter((e) => e.category !== "cardio" && v2Routing(e).some(([m, w]) => routeKeys0.includes(m) && w >= 0.75))
+    .filter((e) => !addQ || e.name.toLowerCase().includes(addQ.toLowerCase()))
+    .sort((a2, b2) => a2.name.localeCompare(b2.name)) : [];
   const maxHead = Math.max(1e-9, ...info.heads.map((h) => heat[h.id] || 0));
+  const routeKeys = routeKeys0;
   const byName = {};
   items.forEach((it) => {
-    const p = (it.primary || []).some((m) => info.muscleIds.includes(m));
-    const s = (it.secondary || []).some((m) => info.muscleIds.includes(m));
-    if (!p && !s) return;
-    if (!byName[it.name] || (p && !byName[it.name].primary)) byName[it.name] = { name: it.name, primary: p };
+    let p = false, sHit = false;
+    if (it.routes) {
+      it.routes.forEach(([m, w]) => { if (routeKeys.includes(m) && w > 0) { if (w >= 0.75) p = true; else sHit = true; } });
+    } else {
+      p = (it.primary || []).some((m) => info.muscleIds.includes(m));
+      sHit = (it.secondary || []).some((m) => info.muscleIds.includes(m));
+    }
+    if (!p && !sHit) return;
+    if (!byName[it.name] || (p && !byName[it.name].primary)) byName[it.name] = { name: it.name, primary: p, id: it.id };
   });
   const exs = Object.values(byName).sort((a, b) => (b.primary - a.primary) || a.name.localeCompare(b.name));
   return (
     <div className="scrim" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheeth"><div className="tt">{info.name}</div><button className="iconbtn" onClick={onClose}><X size={18} /></button></div>
+        {v2 && (() => {
+          const railKeys = muscle === "shoulders" ? ["delt_front", "delt_side", "delt_rear"] : (info.muscleIds || []).filter((m) => RAILS[m]);
+          if (!railKeys.length) return null;
+          const DK = ["biceps", "triceps", "delt_side", "calves"];
+          return (
+            <div className="card">
+              <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 8 }}>Estimated effective sets · weekly</div>
+              {railKeys.map((k) => {
+                const v = v2.weekly[k] || 0; const [lo, hi] = RAILS[k]; const st = v2.status[k];
+                const third = (hi - lo) / 3;
+                const pos = st === "under" ? "UNDER" : st === "over" ? "OVER" : v <= lo + third ? "low end" : v >= hi - third ? "high end" : "mid-range";
+                const col = st === "under" ? "var(--balance-under)" : st === "over" ? "var(--balance-over)" : "var(--good)";
+                return (
+                  <div key={k} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--line)" }}>
+                    <span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>{RAIL_LABELS[k]}</span>
+                    <span className="mono" style={{ fontSize: 12 }}>{v.toFixed(1)} <span style={{ color: "var(--steel)" }}>/ {lo}–{hi}</span>{DK.includes(k) ? <span style={{ color: "var(--steel)" }}> · {Math.round(v2.direct[k] || 0)} direct</span> : null}</span>
+                    <span className="tag mono" style={{ background: "transparent", border: "1px solid " + col, color: col, fontSize: 9.5 }}>{pos}</span>
+                  </div>
+                );
+              })}
+              <p className="muted" style={{ fontSize: 10.5, marginTop: 6 }}>Low end = growing but no buffer; primaries count 1×, strong synergists 0.5×.</p>
+            </div>
+          );
+        })()}
         <div className="card">
           <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--steel)", marginBottom: 10 }}>Heads worked</div>
           {info.heads.map((hd) => { const v = heat[hd.id] || 0; return (
@@ -3535,13 +3909,63 @@ function MuscleZoom({ muscle, heat, colorFor, items, onClose }) {
         </div>
         <div className="divlabel">Exercises hitting this muscle · {exs.length}</div>
         <div className="card" style={{ padding: "4px 16px" }}>
-          {exs.length ? exs.map((e) => (
-            <div className="lrow" key={e.name}>
-              <div className="grow"><div className="name" style={{ fontSize: 14 }}>{e.name}</div></div>
-              <span className="tag" style={{ background: e.primary ? "#FDE9E4" : "var(--surface2)", color: e.primary ? "var(--accent)" : "var(--ink2)", fontSize: 10 }}>{e.primary ? "Primary" : "Secondary"}</span>
-            </div>
-          )) : <div className="empty" style={{ padding: "16px 0" }}><p>Nothing here hits {info.name.toLowerCase()} yet.</p></div>}
+          {exs.length ? exs.map((e) => {
+            const mem = e.id ? inWorkouts(e.id) : [];
+            return (
+              <div className="lrow" key={e.name} style={{ alignItems: "flex-start" }}>
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <div className="name" style={{ fontSize: 14 }}>{e.name}</div>
+                  {edit && mem.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 5 }}>
+                      {mem.map((w) => (
+                        <span key={w.id} className="memchip">
+                          <span className="dot" style={{ background: w.color }} />{w.name}
+                          <button aria-label={"Remove from " + w.name} onClick={() => edit.remove(w.id, e.id)}><X size={11} /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="tag" style={{ background: e.primary ? "#FDE9E4" : "var(--surface2)", color: e.primary ? "var(--accent)" : "var(--ink2)", fontSize: 10, flex: "none" }}>{e.primary ? "Primary" : "Secondary"}</span>
+              </div>
+            );
+          }) : <div className="empty" style={{ padding: "16px 0" }}><p>Nothing here hits {info.name.toLowerCase()} yet.</p></div>}
         </div>
+        {edit && (
+          <>
+            <button className="btn ghost" style={{ marginTop: 12 }} onClick={() => setAddOpen((o) => !o)}>
+              <Plus size={15} /> {addOpen ? "Hide" : "Add"} a {info.name.toLowerCase()} exercise
+            </button>
+            {addOpen && (
+              <div className="card" style={{ marginTop: 10, padding: "8px 12px" }}>
+                <input className="tin" style={{ marginBottom: 6 }} value={addQ} onChange={(ev) => setAddQ(ev.target.value)} placeholder={"Search " + info.name.toLowerCase() + " exercises"} />
+                {candidates.slice(0, 30).map((c) => (
+                  <div key={c.id} style={{ borderBottom: "1px solid var(--line)", padding: "8px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div className="grow" style={{ fontWeight: 700, fontSize: 13.5 }}>{c.name}</div>
+                      <button className="btn dark sm" style={{ padding: "6px 12px" }} onClick={() => setPickFor(pickFor === c.id ? null : c.id)}>Add…</button>
+                    </div>
+                    {pickFor === c.id && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                        {edit.workouts.map((w) => {
+                          const already = w.exerciseIds.includes(c.id);
+                          return (
+                            <button key={w.id} className="memchip pick" disabled={already}
+                              style={already ? { opacity: .45 } : {}}
+                              onClick={() => { edit.add(w.id, c.id); setPickFor(null); }}>
+                              <span className="dot" style={{ background: w.color }} />{w.name}{already ? " ✓" : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {!candidates.length && <p className="muted" style={{ padding: "8px 0" }}>No matching exercises.</p>}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -3623,9 +4047,10 @@ function SessionDetail({ session, progName, dist, onClose }) {
     return () => { live = false; };
   }, [session.id]);
   const sets = session.entries.reduce((a, en) => a + en.sets.length, 0);
+  const su = session.unit || "kg"; // records display in the unit they were entered in
   const vol = Math.round(session.entries.reduce((a, en) => a + en.sets.reduce((x, st) => x + setVolume(st), 0), 0));
   const fmtSet = (st) => {
-    if (st.weight > 0 && st.reps > 0) return `${st.weight}×${st.reps}`;
+    if (st.weight > 0 && st.reps > 0) return `${st.weight}${su}×${st.reps}`;
     if (st.timeSec > 0) return fmtTime(st.timeSec);
     if (st.distance > 0) return `${st.distance}${dist}`;
     if (st.reps > 0) return `${st.reps}`;
