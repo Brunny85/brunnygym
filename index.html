@@ -21,9 +21,17 @@
   }
 }
 </script>
+<script>
+(function(){
+  function show(msg){ try{ var p=document.getElementById('booterr'); if(!p) return; p.style.display='block'; p.textContent += (p.textContent?'\n':'') + msg; }catch(e){} }
+  window.addEventListener('error', function(e){ show('Error: ' + (e.message||e.type) + (e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno:'')); });
+  window.addEventListener('unhandledrejection', function(e){ show('Promise error: ' + (e.reason && (e.reason.message||e.reason))); });
+  setTimeout(function(){ var r=document.getElementById('boot'); if(r && document.body.contains(r)) show('Still loading after 15s. If nothing above, a script/CDN fetch is blocked or timing out (esm.sh / unpkg).'); }, 15000);
+})();
+</script>
 </head>
 <body>
-<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>first load fetches React &amp; icons — needs internet</small></div></div>
+<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v46 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
 <script type="text/babel" data-type="module" data-presets="react">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
@@ -542,7 +550,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v45";
+const APP_VERSION = "v46";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -1860,9 +1868,9 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
             <button className={unit === "lb" ? "on" : ""} onClick={() => setUnit("lb")}>lb</button>
           </div>
         </div>
-      </div>
+      </div>)}
 
-      {active ? (
+      {!mode && (active ? (
         <button className="btn acc" style={{ marginBottom: 14 }} onClick={() => setTab("workout")}>
           <Play size={17} /> Resume {active.routineName} workout
         </button>
@@ -1870,14 +1878,14 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
         <button className="btn dark" style={{ marginBottom: 14 }} onClick={() => setTab("routines")}>
           <Dumbbell size={17} /> Start a workout
         </button>
-      )}
+      ))}
 
-      <div className="stats">
+      <div className="stats" style={{ display: mode === "overview" || !mode ? undefined : "none" }}>
         <div className="stat"><div className="k">Sessions / 7d</div><div className="v mono">{weekSess.length}</div></div>
         <div className="stat"><div className="k">Streak</div><div className="v mono">{stats.streak}<span className="u">days</span></div></div>
         <div className="stat"><div className="k">Volume / 7d</div><div className="v mono">{stats.vol.toLocaleString()}<span className="u">{unit}</span></div></div>
         <div className="stat"><div className="k">Cardio / 7d</div><div className="v mono">{stats.cardioMin}<span className="u">min</span></div></div>
-      </div>)}
+      </div>
 
       {/* last workout */}
       <div className="card" style={{ display: show("last") ? undefined : "none" }}>
