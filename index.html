@@ -31,7 +31,7 @@
 </script>
 </head>
 <body>
-<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v47 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
+<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v51 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
 <script type="text/babel" data-type="module" data-presets="react">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
@@ -299,6 +299,10 @@ const CSS = `
 @keyframes flash{ 0%{background:#FFE3DC;} 100%{background:var(--surface);} }
 @media (prefers-reduced-motion: reduce){ .gt *{ animation:none !important; } }
 
+.gt .notebox{ padding:4px 0 8px; }
+.gt .notebox textarea{ width:100%; resize:vertical; min-height:44px; line-height:1.35; }
+.gt .prevnote{ font-size:12px; color:var(--ink2); background:var(--surface2); border-left:3px solid var(--warn); border-radius:8px; padding:6px 9px; white-space:pre-wrap; }
+.gt .iconbtn.hasnote{ color:var(--warn); }
 .gt .prevcell{ font-size:11.5px; color:var(--steel); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .gt .wutoggle{ display:block; width:100%; text-align:left; background:none; border:none; color:var(--warmink); font-weight:700; font-size:12px; padding:6px 2px; }
 .gt .setrow2{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--line2); font-weight:700; font-size:14px; }
@@ -550,7 +554,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v47";
+const APP_VERSION = "v51";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -1261,6 +1265,41 @@ export default function App() {
         setActiveProgramId(ul4Id);
         packs = [...packs, "routines-andy-8"];
       }
+      if (!packs.includes("routines-andy-9")) {
+        // ULF — Joint-Safe (3 Day). Additive only: no archive, no activation,
+        // all exercises resolve to existing library records (no new entries).
+        const byName9 = {};
+        ex.forEach((e) => { byName9[e.name.trim().toLowerCase()] = e.id; });
+        const N9 = (n) => byName9[n.toLowerCase()];
+        // [name, workingSets, warmups, lo, hi, restSec]
+        const ULF = [
+          { name: "Upper Body", color: "#2E6BE6", ex: [
+            ["Seated Chest Press Machine", 2, 1, 10, 15, 90], ["Chest Supported T-Bar Row", 2, 1, 10, 15, 90], ["Neutral Grip Lat Pulldown", 2, 1, 10, 15, 90],
+            ["Seated Dumbbell Lateral Raise", 2, 0, 15, 20, 60], ["Reverse Cable Crossover (Rear Delt)", 2, 0, 15, 20, 60],
+            ["Straight Bar Pushdown", 2, 0, 12, 20, 60], ["Rope Hammer Curl", 2, 0, 12, 20, 60]] },
+          { name: "Lower Body", color: "#12A5A0", ex: [
+            ["Machine Leg Press", 3, 2, 10, 15, 120], ["Machine Seated Leg Curl", 3, 1, 12, 15, 90], ["Machine Leg Extension", 2, 0, 12, 20, 75],
+            ["Cable Romanian Deadlift", 2, 1, 10, 15, 90], ["Cable Kickback", 2, 0, 12, 20, 60], ["Seated Calf Raise", 3, 0, 12, 20, 60],
+            ["Captains Chair Knee Raise", 2, 0, 12, 20, 60]] },
+          { name: "Full Body", color: "#F2A81E", ex: [
+            ["Machine Leg Press", 2, 1, 12, 15, 90], ["Neutral Grip Seated Cable Row", 2, 1, 10, 15, 90], ["Low to High Cable Fly", 2, 0, 12, 20, 75],
+            ["Machine Seated Leg Curl", 2, 1, 12, 15, 75], ["Seated Dumbbell Lateral Raise", 2, 0, 15, 20, 60], ["Reverse Cable Crossover (Rear Delt)", 2, 0, 15, 20, 60],
+            ["Straight Bar Pushdown", 2, 0, 12, 20, 60], ["Rope Hammer Curl", 2, 0, 12, 20, 60]] },
+        ];
+        const ulfId = "prog_ulf_jointsafe_3day";
+        const progs9 = await store.get("programs", []);
+        if (!progs9.some((p) => p.id === ulfId)) {
+          const rts9 = ULF.map((spec, i) => {
+            const ids = []; const so = {}; const wo = {}; const rep = {}; const rst = {};
+            spec.ex.forEach(([n, w, wu, lo, hi, rr]) => { const id = N9(n); if (id) { ids.push(id); so[id] = w; wo[id] = wu; rep[id] = [lo, hi]; rst[id] = rr; } });
+            return { id: ulfId + "_d" + (i + 1), name: spec.name, color: spec.color, programId: ulfId, exerciseIds: ids, setOverrides: so, wuOverrides: wo, repOverrides: rep, restOverrides: rst };
+          });
+          rt = [...rt, ...rts9];
+          store.set("programs", [...progs9, { id: ulfId, name: "ULF — Joint-Safe (3 Day)", description: "Upper / Lower / Full Body — Joint-Safe Hypertrophy. Three days, ~45–55 min, mostly 2 working sets, machines/cables/supported work. Target 3–4 RIR; double progression.", color: "#73DDC3", createdAt: Date.now() }]);
+          store.set("routines", rt);
+        }
+        packs = [...packs, "routines-andy-9"];
+      }
       // repair: remove duplicate-id exercises (name variants that slugged to
       // the same id across packs). Duplicate React keys corrupt the exercise
       // picker after the first selection. References stay valid: the surviving
@@ -1309,10 +1348,26 @@ export default function App() {
     tick();
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", vis); window.removeEventListener("focus", vis); };
   }, [rest?.running]);
-  const startRest = (sec) => setRest({ total: sec, left: sec, endAt: Date.now() + sec * 1000, running: true });
+  const startRest = (sec) => { try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {} setRest({ total: sec, left: sec, endAt: Date.now() + sec * 1000, running: true }); };
+  useEffect(() => {
+    // iOS shake-to-undo only fires while an input is focused with an undo
+    // stack. Never leave one armed: release focus on background, on any tap
+    // outside a field, on scroll, and after 8s without a keystroke.
+    const blur = () => { try { const el = document.activeElement; if (el && el.blur && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) el.blur(); } catch (e) {} };
+    const onHide = () => { if (document.visibilityState === "hidden") blur(); };
+    const onTouch = (ev) => { const t = ev.target; if (!(t && t.closest && t.closest("input, textarea, .sheet input"))) blur(); };
+    let idle = null;
+    const onKey = () => { clearTimeout(idle); idle = setTimeout(blur, 8000); };
+    const onScroll = () => blur();
+    document.addEventListener("visibilitychange", onHide);
+    document.addEventListener("touchstart", onTouch, { passive: true });
+    document.addEventListener("input", onKey, true);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { document.removeEventListener("visibilitychange", onHide); document.removeEventListener("touchstart", onTouch); document.removeEventListener("input", onKey, true); window.removeEventListener("scroll", onScroll); clearTimeout(idle); };
+  }, []);
 
   /* ---- backup / restore ---- */
-  const ROUTINE_MIGRATIONS = ["routines-andy-2", "routines-andy-3", "routines-andy-4", "routines-andy-5", "routines-andy-6", "routines-andy-7", "units-stamp-1"];
+  const ROUTINE_MIGRATIONS = ["routines-andy-2", "routines-andy-3", "routines-andy-4", "routines-andy-5", "routines-andy-6", "routines-andy-7", "routines-andy-8", "routines-andy-9", "units-stamp-1"];
   const buildBackup = async () => {
     const photos = {};
     for (const sSess of sessions) {
@@ -1386,7 +1441,7 @@ export default function App() {
         const lastSess = sessions.find((s) => s.entries && s.entries.some((en) => en.exerciseId === id));
         const lastEntry = lastSess ? lastSess.entries.find((en) => en.exerciseId === id) : null;
         const rx = resolvePrescription(routine, ex);
-        return { id: uid(), exerciseId: id, rx, sets: makeSets(ex, lastEntry, unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) };
+        return { id: uid(), exerciseId: id, rx, prevNote: lastEntry && lastEntry.note ? lastEntry.note : "", sets: makeSets(ex, lastEntry, unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) };
       });
     saveActive({ id: uid(), routineId: routine.id, routineName: routine.name, color: routine.color, plannedMin: routine.plannedMin, startedAt: Date.now(), unit, dist, completionVersion: 2, entries });
     setTab("workout");
@@ -1413,7 +1468,7 @@ export default function App() {
       if (!sets.length) return null;
       return {
         exerciseId: ex.id, name: ex.name, category: ex.category,
-        trackingType: ex.trackingType, primary: ex.primary, secondary: ex.secondary, sets,
+        trackingType: ex.trackingType, primary: ex.primary, secondary: ex.secondary, sets, note: en.note || "",
       };
     }).filter(Boolean);
     if (entries.length) {
@@ -2903,6 +2958,17 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   const [orderDirty, setOrderDirty] = useState(false);
   const [creating, setCreating] = useState(false);  // new-exercise editor
   const [wuHidden, setWuHidden] = useState({});     // entryId -> warm-ups collapsed
+  const [noteOpen, setNoteOpen] = useState({});     // entryId -> note editor open
+  const updateNote = (ei, text) => saveActive({ ...active, entries: active.entries.map((e2, i2) => i2 === ei ? { ...e2, note: text } : e2) });
+  const removePermanently = (ei) => {
+    const en = active.entries[ei]; if (!en) return;
+    const rtn = routines.find((r) => r.id === active.routineId);
+    if (rtn) {
+      const strip = (o) => { if (!o) return o; const c = { ...o }; delete c[en.exerciseId]; return c; };
+      saveRt(routines.map((r) => r.id === rtn.id ? { ...r, exerciseIds: (r.exerciseIds || []).filter((x) => x !== en.exerciseId), setOverrides: strip(r.setOverrides), wuOverrides: strip(r.wuOverrides), repOverrides: strip(r.repOverrides), restOverrides: strip(r.restOverrides) } : r));
+    }
+    removeExercise(ei);
+  };
   useEffect(() => { if (!skipped) return; const t = setTimeout(() => setSkipped(null), 8000); return () => clearTimeout(t); }, [skipped]);
 
   useEffect(() => {
@@ -2946,6 +3012,8 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     });
     saveActive({ ...active, entries });
     setCollapse((c) => { const n = { ...c }; delete n[en.exerciseId]; return n; });
+    // release keyboard focus so iOS shake-to-undo has no active field to target
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
     if (!wasDone) startRest((en.rx && en.rx.rest) || restDefault); // rest starts on the explicit tick only
   };
   const addSet = (entryIdx) => {
@@ -2972,7 +3040,8 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     const rtn = routines.find((r) => r.id === active.routineId);
     const rx = resolvePrescription(rtn, ex);
     const lastSess = sessions.find((s9) => s9.entries && s9.entries.some((en9) => en9.exerciseId === ex.id));
-    saveActive({ ...active, entries: [...active.entries, { id: uid(), exerciseId: ex.id, rx, sets: makeSets(ex, lastFor(ex.id), unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) }] });
+    const le = lastFor(ex.id);
+    saveActive({ ...active, entries: [...active.entries, { id: uid(), exerciseId: ex.id, rx, prevNote: le && le.note ? le.note : "", sets: makeSets(ex, le, unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) }] });
     if (permanent && rtn && !(rtn.exerciseIds || []).includes(ex.id)) {
       saveRt(routines.map((r) => r.id === rtn.id ? { ...r, exerciseIds: [...(r.exerciseIds || []), ex.id] } : r));
     }
@@ -3093,10 +3162,21 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                     <ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} />
                   </button>
                 )}
-                <button className="iconbtn" onClick={() => setExMenu(ei)}><Trash2 size={15} /></button>
+                <button className={"iconbtn" + (en.note ? " hasnote" : "")} aria-label="Exercise note" onClick={() => setNoteOpen((o) => ({ ...o, [en.id || en.exerciseId]: !o[en.id || en.exerciseId] }))}><Pencil size={15} /></button>
+                <button className="iconbtn" aria-label="Exercise options" onClick={() => setExMenu(ei)}><Trash2 size={15} /></button>
               </div>
             </div>
             <div className="setgrid">
+              {en.prevNote && !en.note && !noteOpen[en.id || en.exerciseId] && (
+                <div className="prevnote">Last time: {en.prevNote}</div>
+              )}
+              {(noteOpen[en.id || en.exerciseId] || en.note) && (
+                <div className="notebox">
+                  {en.prevNote && <div className="prevnote" style={{ marginBottom: 6 }}>Last time: {en.prevNote}</div>}
+                  <textarea className="tin" rows={2} value={en.note || ""} placeholder="Note for this exercise — seat height, grip, how it felt…"
+                    onChange={(e) => updateNote(ei, e.target.value)} />
+                </div>
+              )}
               <div className="setlabels" style={{ gridTemplateColumns: cols }}>
                 <span></span>
                 <span style={{ textAlign: "center" }}>prev</span>
@@ -3179,6 +3259,12 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
               Skip today — injury, machine busy, out of time
             </button>
             <p className="muted" style={{ fontSize: 11 }}>Sets you already completed are kept; only the remaining sets are removed, and this session only (undo available briefly if nothing was completed). The workout template is unchanged.</p>
+            {routines.some((r) => r.id === active.routineId && (r.exerciseIds || []).includes(en.exerciseId)) && (
+              <button className="btn ghost" style={{ width: "100%", marginTop: 12, color: "var(--accent)", borderColor: "var(--accent)" }}
+                onClick={() => { if (window.confirm("Remove " + nm + " from this workout permanently? It leaves the session now and won't appear in future sessions of this workout.")) { removePermanently(exMenu); setExMenu(null); } }}>
+                Remove from workout permanently
+              </button>
+            )}
           </div>
         </div>
       ); })()}
@@ -4372,6 +4458,7 @@ function SessionDetail({ session, progName, dist, onClose }) {
                 <div className="grow">
                   <div className="name" style={{ fontSize: 14 }}>{en.name}</div>
                   <div className="sub">{en.sets.map(fmtSet).join("   ")}</div>
+                  {en.note && <div className="prevnote" style={{ marginTop: 4 }}>{en.note}</div>}
                 </div>
               </div>
             ))}
