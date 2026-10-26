@@ -31,7 +31,7 @@
 </script>
 </head>
 <body>
-<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v51 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
+<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v53 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
 <script type="text/babel" data-type="module" data-presets="react">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
@@ -299,6 +299,8 @@ const CSS = `
 @keyframes flash{ 0%{background:#FFE3DC;} 100%{background:var(--surface);} }
 @media (prefers-reduced-motion: reduce){ .gt *{ animation:none !important; } }
 
+.gt .ssbadge{ display:inline-flex; align-items:center; gap:5px; margin-top:6px; font-size:11.5px; font-weight:700; color:var(--primary); background:color-mix(in srgb, var(--primary) 14%, transparent); border:1px solid color-mix(in srgb, var(--primary) 35%, transparent); border-radius:999px; padding:3px 9px; }
+.gt .iconbtn.sslinked{ color:var(--primary); }
 .gt .notebox{ padding:4px 0 8px; }
 .gt .notebox textarea{ width:100%; resize:vertical; min-height:44px; line-height:1.35; }
 .gt .prevnote{ font-size:12px; color:var(--ink2); background:var(--surface2); border-left:3px solid var(--warn); border-radius:8px; padding:6px 9px; white-space:pre-wrap; }
@@ -551,10 +553,11 @@ const TRACKING = {
   time: { label: "Time only", fields: ["time"] },
   time_sets: { label: "Time & Sets", fields: ["time"] },
   distance_time: { label: "Distance & Time", fields: ["distance", "time"] },
+  intervals: { label: "Intervals (rounds × work/rest)", fields: ["rounds", "work", "rest"] },
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v51";
+const APP_VERSION = "v53";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -912,6 +915,23 @@ const PPLA_EXERCISES = (() => {
   ];
 })();
 
+// Conditioning & cardio library (Oct 2026).
+const CONDITIONING_EXERCISES = (() => {
+  const C = (name, trackingType, secondary = []) => ({ id: "x_" + slug(name), name, category: "cardio", trackingType, primary: ["cardio"], secondary });
+  return [
+    C("Assault Bike", "distance_time", ["quads"]), C("Assault Bike Intervals", "intervals", ["quads"]),
+    C("Ski Erg", "distance_time", ["lats", "triceps"]), C("Ski Erg Intervals", "intervals", ["lats", "triceps"]),
+    C("Rower Intervals", "intervals", ["lats", "hamstrings"]), C("Treadmill Intervals", "intervals", ["quads", "calves"]),
+    C("Bike Intervals", "intervals", ["quads"]), C("Stair Climber", "time", ["quads", "glutes", "calves"]),
+    C("Sled Push", "intervals", ["quads", "glutes"]), C("Sled Pull", "intervals", ["hamstrings", "upper_back"]),
+    C("Battle Ropes", "intervals", ["shoulders", "core"]), C("Kettlebell Swing", "intervals", ["glutes", "hamstrings"]),
+    C("Burpees", "intervals", ["chest", "quads"]), C("Box Jumps", "intervals", ["quads", "glutes"]),
+    C("Farmer's Carry", "intervals", ["forearms", "core"]), C("Swimming", "distance_time", []),
+    C("Outdoor Run", "distance_time", ["quads", "calves"]), C("Outdoor Walk", "distance_time", ["calves"]),
+    C("Hill Sprints", "intervals", ["glutes", "hamstrings", "calves"]), C("Shadow Boxing", "time", ["shoulders", "core"]),
+  ];
+})();
+
 // 4-day upper/lower split additions (Sep 2026).
 const UL4_EXERCISES = (() => {
   const X = (name, primary, secondary = [], trackingType = "weight_reps", category = "weight") =>
@@ -967,7 +987,9 @@ const roundDisp = (v) => Math.round(v * 10) / 10;
 // (completionVersion < 2) keep their historical any-data rule — never
 // retroactively discard old performed work.
 function isPerformedSet(st, cv) {
-  const hasData = (st.reps > 0) || (st.weight > 0) || (st.timeSec > 0) || (st.distance > 0);
+  const hasData = (st.reps > 0) || (st.weight > 0) || (st.timeSec > 0) || (st.distance > 0) || (st.rounds > 0);
+  // interval rows are pre-filled from the plan, so they only count when ticked
+  if (st.rounds > 0 && !(st.reps > 0 || st.weight > 0 || st.timeSec > 0 || st.distance > 0)) return !!st.done;
   return (cv || 1) >= 2 ? (!!st.done && hasData) : hasData;
 }
 const within = (ts, days) => ts >= Date.now() - days * 864e5;
@@ -1076,6 +1098,7 @@ export default function App() {
       applyPack("andy-ul-1", UL_EXERCISES);
       applyPack("andy-ppla-1", PPLA_EXERCISES);
       applyPack("andy-ul4-1", UL4_EXERCISES);
+      applyPack("conditioning-1", CONDITIONING_EXERCISES);
       // ensure every exercise has sub-muscle tags (covers newly added packs too)
       ex = ex.map((e) => (e.subMuscles && e.subMuscles.length) ? e : { ...e, subMuscles: inferSubMuscles(e) });
       if (!packs.includes("submuscle-1")) packs = [...packs, "submuscle-1"];
@@ -1300,6 +1323,28 @@ export default function App() {
         }
         packs = [...packs, "routines-andy-9"];
       }
+      if (!packs.includes("routines-cond-1")) {
+        // Built-in "Conditioning — 3 Day" (inactive): Zone 2 / Intervals / Mixed.
+        const byName10 = {}; ex.forEach((e) => { byName10[e.name.trim().toLowerCase()] = e.id; });
+        const N10 = (n) => byName10[n.toLowerCase()];
+        const CP = "prog_conditioning_3day";
+        const progs10 = await store.get("programs", []);
+        if (!progs10.some((p) => p.id === CP)) {
+          const mk = (id, name, color, items) => {
+            const r = { id, name, color, programId: CP, exerciseIds: [], setOverrides: {}, wuOverrides: {}, cardioOverrides: {} };
+            items.forEach(([n, c]) => { const eid = N10(n); if (eid) { r.exerciseIds.push(eid); r.setOverrides[eid] = 1; r.wuOverrides[eid] = 0; r.cardioOverrides[eid] = c; } });
+            return r;
+          };
+          rt = [...rt,
+            mk(CP + "_d1", "Zone 2 — Steady", "#2E6BE6", [["Incline Walk", { minutes: 35 }], ["Cycling", { minutes: 15 }]]),
+            mk(CP + "_d2", "Intervals — Hard", "#DE3417", [["Assault Bike Intervals", { rounds: 8, work: 30, rest: 90 }], ["Ski Erg Intervals", { rounds: 6, work: 40, rest: 80 }]]),
+            mk(CP + "_d3", "Mixed — Circuit", "#12A5A0", [["Kettlebell Swing", { rounds: 5, work: 40, rest: 20 }], ["Battle Ropes", { rounds: 5, work: 30, rest: 30 }], ["Sled Push", { rounds: 4, work: 30, rest: 60 }], ["Farmer's Carry", { rounds: 4, work: 40, rest: 60 }], ["Rowing", { minutes: 10 }]]),
+          ];
+          store.set("programs", [...progs10, { id: CP, name: "Conditioning — 3 Day", description: "Zone 2 steady state, hard intervals, and a mixed circuit. Pair with any lifting split; log distance/time or rounds and the app keeps cardio minutes.", color: "#E8B04C", createdAt: Date.now() }]);
+          store.set("routines", rt);
+        }
+        packs = [...packs, "routines-cond-1"];
+      }
       // repair: remove duplicate-id exercises (name variants that slugged to
       // the same id across packs). Duplicate React keys corrupt the exercise
       // picker after the first selection. References stay valid: the surviving
@@ -1335,10 +1380,13 @@ export default function App() {
   // Returning to the app (visibility/focus) forces an immediate correct tick.
   useEffect(() => {
     if (!rest?.running) return;
+    // Pure updater: side effects (beep, interval callback) run in the
+    // completion effect below, so React's double-invoked updaters can't
+    // consume the callback twice or skip it.
     const tick = () => setRest((r) => {
       if (!r || !r.running) return r;
       const left = Math.max(0, Math.ceil((r.endAt - Date.now()) / 1000));
-      if (left <= 0) { beep(); return { ...r, left: 0, running: false }; }
+      if (left <= 0) return { ...r, left: 0, running: false, finishedAt: r.endAt };
       return left === r.left ? r : { ...r, left };
     });
     const t = setInterval(tick, 300);
@@ -1348,26 +1396,38 @@ export default function App() {
     tick();
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", vis); window.removeEventListener("focus", vis); };
   }, [rest?.running]);
-  const startRest = (sec) => { try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {} setRest({ total: sec, left: sec, endAt: Date.now() + sec * 1000, running: true }); };
+  const restCb = useRef(null);
+  const lastFinished = useRef(null);
+  useEffect(() => {
+    if (!rest || rest.running || rest.left !== 0 || !rest.finishedAt) return;
+    if (lastFinished.current === rest.finishedAt) return;
+    lastFinished.current = rest.finishedAt;
+    beep();
+    const cb = restCb.current; restCb.current = null;
+    if (cb) cb();
+  }, [rest]);
+  const startRest = (sec, opts) => { try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {} restCb.current = opts && opts.onDone ? opts.onDone : null; setRest({ total: sec, left: sec, endAt: Date.now() + sec * 1000, running: true, label: opts && opts.label ? opts.label : "" }); };
   useEffect(() => {
     // iOS shake-to-undo only fires while an input is focused with an undo
     // stack. Never leave one armed: release focus on background, on any tap
     // outside a field, on scroll, and after 8s without a keystroke.
     const blur = () => { try { const el = document.activeElement; if (el && el.blur && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) el.blur(); } catch (e) {} };
     const onHide = () => { if (document.visibilityState === "hidden") blur(); };
-    const onTouch = (ev) => { const t = ev.target; if (!(t && t.closest && t.closest("input, textarea, .sheet input"))) blur(); };
-    let idle = null;
-    const onKey = () => { clearTimeout(idle); idle = setTimeout(blur, 8000); };
-    const onScroll = () => blur();
+    // NOTE: a scroll-triggered blur was removed (v52): iOS scrolls a field into
+    // view when it gains focus, so blurring on scroll dismissed the keyboard
+    // and bounced the page in a loop for fields near the top/bottom. Same for
+    // the idle timeout, which yanked the keyboard mid-entry.
+    // Tapping the decorative icon that overlays a search box used to count as
+    // "outside" and blur the field (v49-v52). Anything inside a .field-wrap
+    // or on/inside an input now keeps focus.
+    const onTouch = (ev) => { const t = ev.target; if (!(t && t.closest && t.closest("input, textarea, .inp, .tin, .field-wrap, label"))) blur(); };
     document.addEventListener("visibilitychange", onHide);
     document.addEventListener("touchstart", onTouch, { passive: true });
-    document.addEventListener("input", onKey, true);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { document.removeEventListener("visibilitychange", onHide); document.removeEventListener("touchstart", onTouch); document.removeEventListener("input", onKey, true); window.removeEventListener("scroll", onScroll); clearTimeout(idle); };
+    return () => { document.removeEventListener("visibilitychange", onHide); document.removeEventListener("touchstart", onTouch); };
   }, []);
 
   /* ---- backup / restore ---- */
-  const ROUTINE_MIGRATIONS = ["routines-andy-2", "routines-andy-3", "routines-andy-4", "routines-andy-5", "routines-andy-6", "routines-andy-7", "routines-andy-8", "routines-andy-9", "units-stamp-1"];
+  const ROUTINE_MIGRATIONS = ["routines-andy-2", "routines-andy-3", "routines-andy-4", "routines-andy-5", "routines-andy-6", "routines-andy-7", "routines-andy-8", "routines-andy-9", "routines-cond-1", "units-stamp-1"];
   const buildBackup = async () => {
     const photos = {};
     for (const sSess of sessions) {
@@ -1464,11 +1524,12 @@ export default function App() {
       const sets = en.sets.map((s) => ({
         weight: num(s.weight), reps: num(s.reps), warmup: !!s.warmup,
         timeSec: parseTime(s.time), distance: num(s.distance), done: !!s.done,
-      })).filter((s) => s.reps > 0 || s.weight > 0 || s.timeSec > 0 || s.distance > 0);
+        rounds: num(s.rounds), workSec: parseTime(s.work), restSec: parseTime(s.rest),
+      })).filter((s) => s.reps > 0 || s.weight > 0 || s.timeSec > 0 || s.distance > 0 || (s.rounds > 0 && s.done));
       if (!sets.length) return null;
       return {
         exerciseId: ex.id, name: ex.name, category: ex.category,
-        trackingType: ex.trackingType, primary: ex.primary, secondary: ex.secondary, sets, note: en.note || "",
+        trackingType: ex.trackingType, primary: ex.primary, secondary: ex.secondary, sets, note: en.note || "", supersetWith: en.supersetWith ? (exById[(active.entries.find((e9) => (e9.id || e9.exerciseId) === en.supersetWith) || {}).exerciseId] || {}).name || "" : "",
       };
     }).filter(Boolean);
     if (entries.length) {
@@ -1557,7 +1618,7 @@ export default function App() {
                 <div className="cd">{fmtTime(rest.left)}</div>
               </div>
               <div style={{ minWidth: 0 }}>
-                <div className="restlabel">{rest.left === 0 ? "Go — next set" : rest.running ? "Resting" : "Paused"}</div>
+                <div className="restlabel">{rest.label ? rest.label : rest.left === 0 ? "Go — next set" : rest.running ? "Resting" : "Paused"}</div>
                 <div className="restchips">
                   {[60, 90, 120].map((s) => (
                     <button key={s} onClick={() => startRest(s)}>{s}</button>
@@ -1569,7 +1630,7 @@ export default function App() {
                 <button onClick={() => setRest((r) => r.running ? { ...r, running: false } : { ...r, running: true, endAt: Date.now() + r.left * 1000 })}>
                   {rest.running ? <Pause size={16} /> : <Play size={16} />}
                 </button>
-                <button onClick={() => setRest(null)}><X size={16} /></button>
+                <button aria-label="Dismiss timer" onClick={() => { restCb.current = null; setRest(null); }}><X size={16} /></button>
               </div>
               <div className="resttrack"><div className="fillbar" style={{ width: `${pct * 100}%`, background: col }} /></div>
             </div>
@@ -1631,7 +1692,7 @@ export default function App() {
 }
 
 /* ---------------- shared bits ---------------- */
-function newSet(o = {}) { return { id: uid(), weight: "", reps: "", time: "", distance: "", done: false, warmup: !!o.warmup, target: o.target || "", phw: o.phw || "", phr: o.phr || "" }; }
+function newSet(o = {}) { return { id: uid(), weight: "", reps: "", time: "", distance: "", rounds: o.rounds || "", work: o.work || "", rest: o.rest || "", done: false, warmup: !!o.warmup, target: o.target || "", phw: o.phw || "", phr: o.phr || "" }; }
 function isCompound(ex) {
   if (ex && typeof ex.compound === "boolean") return ex.compound;
   return /(squat|deadlift|bench press|chest press|overhead press|shoulder press|military press|push press|barbell row|bent[- ]?over row|pendlay|t-bar row|seal row|romanian|rdl|hip thrust|glute bridge|pull[- ]?up|chin[- ]?up|weighted dip|^dip$|lunge|split squat|bulgarian|leg press|hack squat|power clean|clean|snatch|lat pulldown|pulldown|good morning|thruster|floor press|incline barbell press|incline dumbbell press|decline press|landmine press)/i.test((ex && ex.name) || "");
@@ -1653,7 +1714,14 @@ function liftDefaults(ex) {
 }
 function incFor(ex, unit) { const c = isCompound(ex); return unit === "lb" ? (c ? 5 : 2.5) : (c ? 2.5 : 1.25); }
 function makeSets(ex, lastEntry, unit, rx, lastMeta) {
-  if (!ex || ex.category === "cardio") return [newSet()];
+  if (!ex || ex.category === "cardio") {
+    const c = rx && rx.cardio;
+    if (ex && ex.trackingType === "intervals") return [newSet({ rounds: c && c.rounds ? String(c.rounds) : "", work: c && c.work ? fmtTime(c.work) : "", rest: c && c.rest ? fmtTime(c.rest) : "" })];
+    const st = newSet();
+    if (c && c.minutes) st.target = `${c.minutes} min`;
+    if (c && c.distance) st.target = (st.target ? st.target + " · " : "") + `${c.distance} `;
+    return [st];
+  }
   const p9 = rx || liftDefaults(ex); const out = [];
   const lu = (lastMeta && lastMeta.unit) || unit;
   const cv = (lastMeta && lastMeta.cv) || 1;
@@ -1872,7 +1940,7 @@ function Dashboard({ sessions, exercises, routines, programs, exById, active, un
     let vol = 0, cardioSec = 0, cardioDist = 0;
     weekSess.forEach((s) => s.entries.forEach((en) => en.sets.forEach((st) => {
       vol += setVolume(st);
-      if (en.category === "cardio") { cardioSec += st.timeSec; cardioDist += st.distance; }
+      if (en.category === "cardio" && isPerformedSet(st, s.completionVersion)) { cardioSec += (st.timeSec || 0) + ((st.rounds || 0) * ((st.workSec || 0) + (st.restSec || 0))); cardioDist += st.distance || 0; }
     })));
     // streak
     const days = new Set(sessions.map((s) => dayKey(s.date)));
@@ -2354,7 +2422,9 @@ function resolvePrescription(routine, ex) {
   const wu = ov(routine && routine.wuOverrides);
   const reps = ov(routine && routine.repOverrides);
   const rest = ov(routine && routine.restOverrides);
+  const cardio = ov(routine && routine.cardioOverrides); // { minutes?, distance?, rounds?, work?, rest? }
   return {
+    cardio: cardio || null,
     warmups: wu ?? d.warmups,
     work: work ?? d.work,
     lo: (reps && reps[0]) ?? d.lo,
@@ -2366,7 +2436,13 @@ function estimateMin(routine, exById, restSec = 90) {
   let sec = 0;
   (routine.exerciseIds || []).forEach((id) => {
     const ex = exById[id]; if (!ex) return;
-    if (ex.category === "cardio") { sec += 10 * 60; return; }
+    if (ex.category === "cardio") {
+      const c = resolvePrescription(routine, ex).cardio;
+      if (c && c.rounds && c.work) sec += c.rounds * (c.work + (c.rest || 0)) + 120;
+      else if (c && c.minutes) sec += c.minutes * 60 + 60;
+      else sec += 10 * 60;
+      return;
+    }
     const rx = resolvePrescription(routine, ex);
     const rr = rx.rest ?? restSec;
     sec += rx.warmups * (30 + Math.min(60, rr * 0.6));
@@ -2376,7 +2452,12 @@ function estimateMin(routine, exById, restSec = 90) {
   return Math.max(5, Math.round(sec / 60 / 5) * 5);
 }
 function rxText(routine, ex) {
-  if (ex.category === "cardio") return "cardio";
+  if (ex.category === "cardio") {
+    const c = resolvePrescription(routine, ex).cardio;
+    if (c && c.rounds) return `${c.rounds} rounds × ${fmtTime(c.work || 0)} work / ${fmtTime(c.rest || 0)} rest [intervals]`;
+    if (c && (c.minutes || c.distance)) return `${c.minutes ? c.minutes + " min" : ""}${c.minutes && c.distance ? " · " : ""}${c.distance ? c.distance + " distance" : ""} [cardio]`;
+    return "cardio";
+  }
   const rx = resolvePrescription(routine, ex);
   return `${rx.warmups} warm-up + ${rx.work} working sets × ${rx.lo}-${rx.hi} reps${rx.rest ? ` · rest ${rx.rest}s` : ""} [${mechOf(ex) === "compound" ? "compound" : "isolation"}]`;
 }
@@ -2838,6 +2919,8 @@ function RoutineEditor({ routine, exercises, onSave, onClose }) {
   const [color, setColor] = useState(routine.color || "#DE3417");
   const [plannedMin, setPlannedMin] = useState(routine.plannedMin ? String(routine.plannedMin) : "");
   const [ids, setIds] = useState(routine.exerciseIds || []);
+  const [cardioOv, setCardioOv] = useState(routine.cardioOverrides || {});
+  const setCardio = (id, k, v) => setCardioOv((o) => ({ ...o, [id]: { ...(o[id] || {}), [k]: v === "" ? undefined : (k === "work" || k === "rest" ? parseTime(v) : num(v)) } }));
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const colors = ["#DE3417", "#E5473B", "#2E6BE6", "#12A5A0", "#F2A81E", "#8E44D8", "#159C86"];
@@ -2890,10 +2973,28 @@ function RoutineEditor({ routine, exercises, onSave, onClose }) {
                 onReorder={(order) => setIds(order)}
                 onRemove={(id) => toggle(id)} />
               <p className="muted" style={{ fontSize: 11, margin: "2px 2px 12px" }}>Drag the handle to reorder. This is the order they'll appear in your workout.</p>
+              {ids.filter((id) => (exercises.find((x) => x.id === id) || {}).category === "cardio").map((id) => {
+                const ex = exercises.find((x) => x.id === id); const c = cardioOv[id] || {}; const iv = ex.trackingType === "intervals";
+                return (
+                  <div key={id} className="card tight" style={{ marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{ex.name} <span className="muted" style={{ fontWeight: 500 }}>· plan</span></div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {iv ? (<>
+                        <label className="field-wrap" style={{ flex: 1, minWidth: 80 }}><span className="muted" style={{ fontSize: 11 }}>Rounds</span><input className="tin mono" inputMode="numeric" value={c.rounds ?? ""} onChange={(e) => setCardio(id, "rounds", e.target.value)} placeholder="8" /></label>
+                        <label className="field-wrap" style={{ flex: 1, minWidth: 80 }}><span className="muted" style={{ fontSize: 11 }}>Work m:ss</span><input className="tin mono" value={c.work ? fmtTime(c.work) : ""} onChange={(e) => setCardio(id, "work", e.target.value)} placeholder="0:30" /></label>
+                        <label className="field-wrap" style={{ flex: 1, minWidth: 80 }}><span className="muted" style={{ fontSize: 11 }}>Rest m:ss</span><input className="tin mono" value={c.rest ? fmtTime(c.rest) : ""} onChange={(e) => setCardio(id, "rest", e.target.value)} placeholder="1:30" /></label>
+                      </>) : (<>
+                        <label className="field-wrap" style={{ flex: 1, minWidth: 90 }}><span className="muted" style={{ fontSize: 11 }}>Minutes</span><input className="tin mono" inputMode="numeric" value={c.minutes ?? ""} onChange={(e) => setCardio(id, "minutes", e.target.value)} placeholder="30" /></label>
+                        {TRACKING[ex.trackingType].fields.includes("distance") && <label className="field-wrap" style={{ flex: 1, minWidth: 90 }}><span className="muted" style={{ fontSize: 11 }}>Distance</span><input className="tin mono" inputMode="decimal" value={c.distance ?? ""} onChange={(e) => setCardio(id, "distance", e.target.value)} placeholder="5" /></label>}
+                      </>)}
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
-          <div style={{ position: "relative", marginBottom: 10 }}>
-            <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)" }} />
+          <div className="field-wrap" style={{ position: "relative", marginBottom: 10 }}>
+            <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)", pointerEvents: "none" }} />
             <input className="tin" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search library" />
           </div>
           <div className="chiprow">
@@ -2930,7 +3031,7 @@ function RoutineEditor({ routine, exercises, onSave, onClose }) {
           )}
         </div>
         <div className="sheetfoot">
-          <button className="btn acc" disabled={!name.trim()} onClick={() => onSave({ ...routine, name: name.trim(), color, plannedMin: plannedMin ? parseInt(plannedMin, 10) : undefined, exerciseIds: [...ids] })}>
+          <button className="btn acc" disabled={!name.trim()} onClick={() => onSave({ ...routine, name: name.trim(), color, plannedMin: plannedMin ? parseInt(plannedMin, 10) : undefined, exerciseIds: [...ids], cardioOverrides: Object.fromEntries(Object.entries(cardioOv).filter(([k]) => ids.includes(k))) })}>
             <Check size={17} /> Save workout{ids.length ? ` · ${ids.length}` : ""}
           </button>
         </div>
@@ -2959,6 +3060,49 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   const [creating, setCreating] = useState(false);  // new-exercise editor
   const [wuHidden, setWuHidden] = useState({});     // entryId -> warm-ups collapsed
   const [noteOpen, setNoteOpen] = useState({});     // entryId -> note editor open
+  const [ssPick, setSsPick] = useState(null);       // entry index awaiting a superset partner
+  const [ivl, setIvl] = useState(null);             // { ei, setId, round, total, phase: "work"|"rest", workSec, restSec }
+  const ivlRef = useRef(null); ivlRef.current = ivl;
+  const startIntervals = (ei9, setId, rounds, workSec, restSec) => {
+    const st = { ei: ei9, setId, round: 1, total: rounds, phase: "work", workSec, restSec };
+    ivlRef.current = st; setIvl(st); startRest(workSec, { label: "Work · round 1/" + rounds, onDone: () => advanceIvl(st) });
+  };
+  // The engine carries its own state object through the callback chain so it
+  // never depends on React having flushed the previous setIvl.
+  const advanceIvl = (cur) => {
+    if (!cur) return;
+    const go = (nx, sec, label) => { ivlRef.current = nx; setIvl(nx); startRest(sec, { label, onDone: () => advanceIvl(nx) }); };
+    if (cur.phase === "work") {
+      if (cur.round >= cur.total) { ivlRef.current = null; setIvl(null); setActiveEntriesDone(cur.ei, cur.setId); return; }
+      if (cur.restSec > 0) { go({ ...cur, phase: "rest" }, cur.restSec, "Rest · next round " + (cur.round + 1) + "/" + cur.total); return; }
+      const nx = { ...cur, round: cur.round + 1 }; go(nx, cur.workSec, "Work · round " + nx.round + "/" + cur.total);
+    } else {
+      const nx = { ...cur, phase: "work", round: cur.round + 1 }; go(nx, cur.workSec, "Work · round " + nx.round + "/" + cur.total);
+    }
+  };
+  const activeRef = useRef(active); activeRef.current = active;
+  const setActiveEntriesDone = (ei9, setId) => {
+    const a0 = activeRef.current; if (!a0 || !a0.entries[ei9]) return;
+    const entries = a0.entries.map((e2, i2) => i2 !== ei9 ? e2 : { ...e2, sets: e2.sets.map((s2) => s2.id === setId ? { ...s2, done: true } : s2) });
+    saveActive({ ...a0, entries });
+  };
+  const eid = (en) => en.id || en.exerciseId;
+  const partnerOf = (en) => en.supersetWith ? active.entries.find((e2) => eid(e2) === en.supersetWith) : null;
+  const linkSuperset = (ai, bi) => {
+    const A = active.entries[ai], B = active.entries[bi]; if (!A || !B || ai === bi) return;
+    // unlink any existing partners first, then pair and place B directly after A
+    let entries = active.entries.map((e2) => (e2.supersetWith === eid(A) || e2.supersetWith === eid(B)) ? { ...e2, supersetWith: undefined } : e2);
+    entries = entries.map((e2) => eid(e2) === eid(A) ? { ...e2, supersetWith: eid(B) } : eid(e2) === eid(B) ? { ...e2, supersetWith: eid(A) } : e2);
+    const bEntry = entries.find((e2) => eid(e2) === eid(B));
+    entries = entries.filter((e2) => eid(e2) !== eid(B));
+    const aIdx = entries.findIndex((e2) => eid(e2) === eid(A));
+    entries.splice(aIdx + 1, 0, bEntry);
+    saveActive({ ...active, entries }); setSsPick(null);
+  };
+  const unlinkSuperset = (en) => {
+    const p = en.supersetWith;
+    saveActive({ ...active, entries: active.entries.map((e2) => (eid(e2) === eid(en) || eid(e2) === p) ? { ...e2, supersetWith: undefined } : e2) });
+  };
   const updateNote = (ei, text) => saveActive({ ...active, entries: active.entries.map((e2, i2) => i2 === ei ? { ...e2, note: text } : e2) });
   const removePermanently = (ei) => {
     const en = active.entries[ei]; if (!en) return;
@@ -3014,7 +3158,17 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
     setCollapse((c) => { const n = { ...c }; delete n[en.exerciseId]; return n; });
     // release keyboard focus so iOS shake-to-undo has no active field to target
     try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
-    if (!wasDone) startRest((en.rx && en.rx.rest) || restDefault); // rest starts on the explicit tick only
+    if (!wasDone) {
+      const partner = partnerOf(en);
+      if (partner) {
+        // superset: no rest between A and B; rest after the pair (i.e. when the
+        // partner has at least as many completed sets as this one now does)
+        const mine = en.sets.filter((s2) => s2.done).length + 1;
+        const theirs = partner.sets.filter((s2) => s2.done).length;
+        const isSecond = active.entries.findIndex((e2) => eid(e2) === eid(en)) > active.entries.findIndex((e2) => eid(e2) === eid(partner));
+        if (isSecond || theirs >= mine) startRest((en.rx && en.rx.rest) || restDefault);
+      } else startRest((en.rx && en.rx.rest) || restDefault); // rest starts on the explicit tick only
+    }
   };
   const addSet = (entryIdx) => {
     const ex = exById[active.entries[entryIdx].exerciseId]; const d = liftDefaults(ex);
@@ -3119,7 +3273,8 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
         const ex = exById[en.exerciseId]; if (!ex) return null;
         const fields = TRACKING[ex.trackingType].fields;
         const last = lastFor(en.exerciseId);
-        const cols = `28px 54px ${fields.map(() => "1fr").join(" ")} 42px 30px`;
+        const isIntervals = ex.trackingType === "intervals";
+        const cols = isIntervals ? `28px ${fields.map(() => "1fr").join(" ")} 96px 42px 30px` : `28px 54px ${fields.map(() => "1fr").join(" ")} 42px 30px`;
         const lastTxt = last ? last.sets.map((s) => {
           if (s.weight) return `${s.weight}×${s.reps}`;
           if (s.timeSec) return fmtTime(s.timeSec);
@@ -3143,7 +3298,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
               <span className={`donedot ${allDone ? "on" : ""}`}><Check size={13} /></span>
               <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
                 <span className="en" style={{ fontSize: 15.5, display: "block" }}>{ex.name}</span>
-                <span className="mono colmeta">{doneCount}/{en.sets.length} sets{setsTxt ? ` · ${setsTxt}` : ""}</span>
+                <span className="mono colmeta">{partnerOf(en) ? "SS · " : ""}{doneCount}/{en.sets.length} sets{setsTxt ? ` · ${setsTxt}` : ""}</span>
               </span>
               <ChevronRight size={17} style={{ color: "var(--steel)", transform: "rotate(90deg)", flex: "none" }} />
             </button>
@@ -3154,6 +3309,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="en">{ex.name}</div>
+                  {partnerOf(en) && <div className="ssbadge"><Layers size={11} /> Superset with {exById[partnerOf(en).exerciseId]?.name || "…"} · rest after the pair</div>}
                   <div style={{ marginTop: 7 }}><MuscleTags ids={ex.primary} /></div>
                   {lastTxt && <div className="last">Last: {lastTxt}</div>}
                 </div>
@@ -3162,6 +3318,8 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                     <ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} />
                   </button>
                 )}
+                <button className={"iconbtn" + (en.supersetWith ? " sslinked" : "")} aria-label={en.supersetWith ? "Unlink superset" : "Superset with…"} title={en.supersetWith ? "Unlink superset" : "Superset with…"}
+                  onClick={() => en.supersetWith ? unlinkSuperset(en) : setSsPick(ei)}><Layers size={15} /></button>
                 <button className={"iconbtn" + (en.note ? " hasnote" : "")} aria-label="Exercise note" onClick={() => setNoteOpen((o) => ({ ...o, [en.id || en.exerciseId]: !o[en.id || en.exerciseId] }))}><Pencil size={15} /></button>
                 <button className="iconbtn" aria-label="Exercise options" onClick={() => setExMenu(ei)}><Trash2 size={15} /></button>
               </div>
@@ -3179,8 +3337,9 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
               )}
               <div className="setlabels" style={{ gridTemplateColumns: cols }}>
                 <span></span>
-                <span style={{ textAlign: "center" }}>prev</span>
-                {fields.map((f) => <span key={f} style={{ textAlign: "center" }}>{f === "weight" ? unit : f === "distance" ? dist : f === "time" ? "m:ss" : f}</span>)}
+                {!isIntervals && <span style={{ textAlign: "center" }}>prev</span>}
+                {fields.map((f) => <span key={f} style={{ textAlign: "center" }}>{f === "weight" ? unit : f === "distance" ? dist : f === "time" ? "m:ss" : f === "work" || f === "rest" ? f + " m:ss" : f}</span>)}
+                {isIntervals && <span style={{ textAlign: "center" }}>timer</span>}
                 <span></span>
                 <span></span>
               </div>
@@ -3197,12 +3356,19 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
                 const rowFor = ({ s, label }) => (
                       <div className={`setrow ${s.done ? "done" : ""} ${s.warmup ? "warm" : ""}`} key={s.id} style={{ gridTemplateColumns: cols }}>
                         <span className="setno">{label}</span>
-                        <span className="prevcell mono" aria-label="Previous session">{s.phw ? `${s.phw}×${s.phr || "?"}` : s.phr ? `×${s.phr}` : "–"}</span>
+                        {!isIntervals && <span className="prevcell mono" aria-label="Previous session">{s.phw ? `${s.phw}×${s.phr || "?"}` : s.phr ? `×${s.phr}` : "–"}</span>}
                         {fields.map((f) => (
-                          <input key={f} className="inp" inputMode={f === "time" ? "text" : "decimal"}
-                            value={s[f]} placeholder={f === "reps" ? ((!s.warmup && s.target) || "0") : f === "time" ? "0:00" : "0"}
+                          <input key={f} className="inp" inputMode={f === "time" || f === "work" || f === "rest" ? "text" : "decimal"}
+                            value={s[f]} placeholder={f === "reps" ? ((!s.warmup && s.target) || "0") : f === "time" ? (s.target || "0:00") : f === "work" || f === "rest" ? "0:00" : f === "distance" ? (s.target && s.target.indexOf("min") < 0 ? s.target.trim() : "0") : "0"}
                             onChange={(e) => update(ei, s.id, f, e.target.value)} />
                         ))}
+                        {isIntervals && (
+                          <button className="btn dark sm" style={{ padding: "6px 8px", fontSize: 12 }} disabled={!num(s.rounds) || !parseTime(s.work)}
+                            aria-label="Start interval timer"
+                            onClick={() => startIntervals(ei, s.id, num(s.rounds), parseTime(s.work), parseTime(s.rest))}>
+                            {ivl && ivl.setId === s.id ? `R${ivl.round}/${ivl.total} ${ivl.phase}` : "Start"}
+                          </button>
+                        )}
                         <button className={`ck ${s.done ? "on" : ""}`} aria-label={s.done ? "Mark set incomplete" : "Complete set"} onClick={() => toggleDone(ei, s.id)}><Check size={18} /></button>
                         <button className="setdel" aria-label="Delete set" onClick={() => removeSet(ei, s.id)}><X size={15} /></button>
                       </div>
@@ -3240,6 +3406,23 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
         <PickExercise exercises={exercises} exclude={active.entries.map((e) => e.exerciseId)} onPick={addExercise} onCreate={() => { setAdding(false); setCreating(true); }} onClose={() => setAdding(false)} />
       )}
       {creating && <ExerciseEditor exercise={{}} onSave={createExercise} onClose={() => setCreating(false)} />}
+      {ssPick != null && active.entries[ssPick] && (
+        <div className="scrim" onClick={() => setSsPick(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 24 }}>
+            <div className="sheeth"><div className="tt">Superset {exById[active.entries[ssPick].exerciseId]?.name} with…</div><button className="iconbtn" aria-label="Close" onClick={() => setSsPick(null)}><X size={18} /></button></div>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>The partner moves directly after this exercise. Alternate sets A → B; the rest timer starts after each pair.</p>
+            {active.entries.map((e2, i2) => i2 === ssPick ? null : (
+              <button key={eid(e2)} className="lrow" style={{ width: "100%", textAlign: "left", background: "none", border: "none" }} onClick={() => linkSuperset(ssPick, i2)}>
+                <div className="grow">
+                  <div className="name" style={{ fontSize: 14 }}>{exById[e2.exerciseId]?.name}</div>
+                  <div className="sub">{e2.sets.filter((s2) => s2.done).length}/{e2.sets.length} sets done{e2.supersetWith ? " · currently in another superset" : ""}</div>
+                </div>
+                <Layers size={16} color="var(--steel)" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {exMenu != null && active.entries[exMenu] && (() => { const en = active.entries[exMenu]; const nm = exById[en.exerciseId]?.name || "Exercise"; return (
         <div className="scrim" onClick={() => setExMenu(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 24 }}>
@@ -3349,8 +3532,8 @@ function PickExercise({ exercises, exclude, onPick, onCreate, onClose }) {
     <div className="scrim" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheeth"><div className="tt">Add exercise</div><button className="iconbtn" onClick={onClose}><X size={18} /></button></div>
-        <div style={{ position: "relative", marginBottom: 12 }}>
-          <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)" }} />
+        <div className="field-wrap" style={{ position: "relative", marginBottom: 12 }}>
+          <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)", pointerEvents: "none" }} />
           <input className="tin" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search library" />
         </div>
         {onCreate && <button className="btn ghost" style={{ width: "100%", marginBottom: 10 }} onClick={onCreate}><Plus size={15} /> Create new exercise</button>}
@@ -3417,9 +3600,9 @@ function LibraryView({ exercises, saveEx, routines }) {
         <button className="iconbtn acc" onClick={() => setEditing({ name: "", category: "weight", trackingType: "weight_reps", primary: [], secondary: [], subMuscles: [] })}><Plus size={20} /></button>
       </div>
 
-      <div style={{ position: "relative", marginBottom: 10 }}>
-        <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)" }} />
-        <input className="tin" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search exercises" />
+      <div className="field-wrap" style={{ position: "relative", marginBottom: 10 }}>
+        <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)", pointerEvents: "none" }} />
+        <input className="tin" type="search" autoCorrect="off" autoCapitalize="none" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search exercises" />
       </div>
 
       <div className="chiprow">
@@ -3466,7 +3649,7 @@ function ExerciseEditor({ exercise, onSave, onClose }) {
   const [subMuscles, setSubMuscles] = useState(exercise.subMuscles || []);
 
   const trackOptions = category === "cardio"
-    ? ["distance_time", "time", "time_sets"]
+    ? ["distance_time", "time", "time_sets", "intervals"]
     : ["weight_reps", "reps", "time", "time_sets", "distance_time"];
 
   const selectedMuscles = [...new Set([...primary, ...secondary])];
@@ -4430,6 +4613,7 @@ function SessionDetail({ session, progName, dist, onClose }) {
   const vol = Math.round(session.entries.reduce((a, en) => a + en.sets.reduce((x, st) => x + setVolume(st), 0), 0));
   const fmtSet = (st) => {
     if (st.weight > 0 && st.reps > 0) return `${st.weight}${su}×${st.reps}`;
+    if (st.rounds > 0) return `${st.rounds}×${fmtTime(st.workSec || 0)}/${fmtTime(st.restSec || 0)}`;
     if (st.timeSec > 0) return fmtTime(st.timeSec);
     if (st.distance > 0) return `${st.distance}${dist}`;
     if (st.reps > 0) return `${st.reps}`;
