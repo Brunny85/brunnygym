@@ -31,7 +31,7 @@
 </script>
 </head>
 <body>
-<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v53 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
+<div id="root"><div id="boot">Loading Iron &amp; Chalk…<small>build v54 · first load fetches React &amp; icons — needs internet</small><pre id="booterr" style="display:none;white-space:pre-wrap;text-align:left;font-size:11px;color:#c0392b;margin:16px auto;max-width:360px;font-family:monospace"></pre></div></div>
 <script type="text/babel" data-type="module" data-presets="react">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
@@ -557,7 +557,7 @@ const TRACKING = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const APP_VERSION = "v53";
+const APP_VERSION = "v54";
 
 /* ---------------- seed data ---------------- */
 function seedExercises() {
@@ -1491,6 +1491,30 @@ export default function App() {
   };
 
   /* ---- workout actions ---- */
+  // Ad-hoc activity (cardio / conditioning / anything outside the weekly split).
+  // Starts a live session from one exercise with an optional plan, no routine needed.
+  const startAdhoc = (ex, plan, typeId) => {
+    if (!ex) return;
+    if (active && !window.confirm('A workout ("' + active.routineName + '") is already in progress. Discard it and start ' + ex.name + '?')) return;
+    if (active) setRest(null);
+    const fake = { exerciseIds: [ex.id], cardioOverrides: plan ? { [ex.id]: plan } : {} };
+    const rx = resolvePrescription(fake, ex);
+    const lastSess = sessions.find((s9) => s9.entries && s9.entries.some((en9) => en9.exerciseId === ex.id));
+    const lastEntry = lastSess ? lastSess.entries.find((en9) => en9.exerciseId === ex.id) : null;
+    const t = workoutTypeById[typeId] || workoutTypeById[ex.category === "cardio" ? "cardio" : "weights"];
+    saveActive({ id: uid(), routineId: null, routineName: ex.name, color: t.color, adhoc: true, type: t.id, startedAt: Date.now(), unit, dist, completionVersion: 2,
+      entries: [{ id: uid(), exerciseId: ex.id, rx, prevNote: lastEntry && lastEntry.note ? lastEntry.note : "", sets: makeSets(ex, lastEntry, unit, rx, { unit: lastSess ? lastSess.unit : unit, cv: lastSess ? lastSess.completionVersion : 1 }) }] });
+    setLiveOpen(true); setTabRaw("train");
+  };
+  // Record an activity already done (today or a past date) with real detail.
+  const recordAdhoc = ({ ex, date, typeId, minutes, distance, rounds, work, rest, note }) => {
+    const t = workoutTypeById[typeId] || workoutTypeById["cardio"];
+    const secs = Math.round((minutes || 0) * 60);
+    const set = { weight: 0, reps: 0, warmup: false, timeSec: secs, distance: num(distance), done: true, rounds: num(rounds), workSec: parseTime(work || 0), restSec: parseTime(rest || 0) };
+    const entries = ex ? [{ exerciseId: ex.id, name: ex.name, category: ex.category, trackingType: ex.trackingType, primary: ex.primary, secondary: ex.secondary, note: note || "", sets: [set] }] : [];
+    const dur = secs || (set.rounds * (set.workSec + set.restSec));
+    addSession({ id: uid(), date, type: t.id, routineName: ex ? ex.name : t.name, color: t.color, startedAt: date, endedAt: date + dur * 1000, unit, dist, completionVersion: 2, durationSec: dur, adhoc: true, quick: !ex, entries });
+  };
   const startWorkout = (routine) => {
     if (active && !window.confirm('A workout ("' + active.routineName + '") is already in progress. Discard it and start "' + routine.name + '"?')) return;
     if (active) setRest(null);
@@ -1535,7 +1559,7 @@ export default function App() {
     if (entries.length) {
       if (hrPhoto) store.set(`hrphoto:${active.id}`, hrPhoto);
       const ok = await addSessionAwaited({
-        id: active.id, date: Date.now(), routineName: active.routineName, routineId: active.routineId, type: type || "weights",
+        id: active.id, date: Date.now(), routineName: active.routineName, routineId: active.routineId, type: type || active.type || "weights", adhoc: !!active.adhoc,
         color: active.color, startedAt: active.startedAt, endedAt: Date.now(), unit, dist, completionVersion: 2,
         durationSec: Math.round((Date.now() - active.startedAt) / 1000), hrPhoto: !!hrPhoto, entries,
       });
@@ -1560,7 +1584,8 @@ export default function App() {
       <style>{CSS}</style>
       <div className="wrap">
         {tab === "today" && (
-          <Today {...{ active, sessions, routines, programs, exById, activeProgramId, unit, restDefault, setTab }}
+          <Today {...{ active, sessions, routines, programs, exById, activeProgramId, unit, restDefault, setTab, exercises, dist }}
+            onStartAdhoc={startAdhoc} onRecordAdhoc={recordAdhoc}
             onResume={() => { setLiveOpen(true); setTabRaw("train"); }}
             onOpenSettings={() => setShowSettings(true)}
             onOpenMuscles={() => { setProgressSub("muscles"); setTabRaw("progress"); }} />
@@ -1821,8 +1846,84 @@ function MuscleTags({ ids, half }) {
 /* ============================================================
    DASHBOARD
    ============================================================ */
-function Today({ active, sessions, routines, programs, exById, activeProgramId, unit, restDefault, setTab, onResume, onOpenSettings, onOpenMuscles }) {
+function AdhocSheet({ exercises, dist, onStart, onRecord, onClose }) {
+  const [mode, setMode] = useState("now");          // now | past
+  const [q, setQ] = useState("");
+  const [ex, setEx] = useState(null);
+  const [typeId, setTypeId] = useState("cardio");
+  const [minutes, setMinutes] = useState(""); const [distance, setDistance] = useState("");
+  const [rounds, setRounds] = useState(""); const [work, setWork] = useState(""); const [rest, setRest] = useState("");
+  const [when, setWhen] = useState(() => { const d = new Date(); return dayKey(d.getTime()); });
+  const [note, setNote] = useState("");
+  const cardio = exercises.filter((e) => e.category === "cardio");
+  const recent = (() => { const seen = new Set(); const out = []; for (const e of cardio) { if (/walk|run|cycl|bike|row|swim|stair|elliptical/i.test(e.name) && !seen.has(e.id)) { seen.add(e.id); out.push(e); } } return out.slice(0, 8); })();
+  const list = (q ? exercises.filter((e) => e.name.toLowerCase().includes(q.toLowerCase())) : recent).slice(0, 30);
+  const iv = ex && ex.trackingType === "intervals";
+  const plan = () => iv ? { rounds: num(rounds) || undefined, work: parseTime(work) || undefined, rest: parseTime(rest) || undefined } : { minutes: num(minutes) || undefined, distance: num(distance) || undefined };
+  const canRecord = ex && (iv ? num(rounds) > 0 && parseTime(work) > 0 : (num(minutes) > 0 || num(distance) > 0));
+  return (
+    <div className="scrim" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 24 }}>
+        <div className="sheeth"><div className="tt">Log an activity</div><button className="iconbtn" aria-label="Close" onClick={onClose}><X size={18} /></button></div>
+        <div className="seg" style={{ display: "flex", marginBottom: 12 }}>
+          <button className={mode === "now" ? "on" : ""} style={{ flex: 1 }} onClick={() => setMode("now")}>Start now</button>
+          <button className={mode === "past" ? "on" : ""} style={{ flex: 1 }} onClick={() => setMode("past")}>Already done</button>
+        </div>
+        {!ex ? (
+          <>
+            <div className="field-wrap" style={{ position: "relative", marginBottom: 10 }}>
+              <Search size={15} style={{ position: "absolute", left: 12, top: 13, color: "var(--steel)", pointerEvents: "none" }} />
+              <input className="tin" type="search" autoCorrect="off" autoCapitalize="none" style={{ paddingLeft: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Run, walk, bike, swim, sled…" />
+            </div>
+            {!q && <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>Common</div>}
+            {list.map((e) => (
+              <button key={e.id} className="lrow" style={{ width: "100%", textAlign: "left", background: "none", border: "none" }} onClick={() => setEx(e)}>
+                <div className="grow"><div className="name" style={{ fontSize: 14 }}>{e.name}</div><div className="sub">{TRACKING[e.trackingType].label}{e.category !== "cardio" ? " · strength" : ""}</div></div>
+                <ChevronRight size={16} color="var(--steel)" />
+              </button>
+            ))}
+            {!list.length && <p className="muted">Nothing matches — add it in Library first.</p>}
+          </>
+        ) : (
+          <>
+            <button className="lrow" style={{ width: "100%", textAlign: "left", background: "none", border: "none", marginBottom: 8 }} onClick={() => setEx(null)}>
+              <div className="grow"><div className="name" style={{ fontSize: 15 }}>{ex.name}</div><div className="sub">tap to change</div></div>
+              <Pencil size={14} color="var(--steel)" />
+            </button>
+            <div className="field"><label>Type</label>
+              <div className="tags">{WORKOUT_TYPES.filter((t) => t.id !== "weights").map((t) => (
+                <button key={t.id} className={"tag chip " + (typeId === t.id ? "on" : "")} style={typeId === t.id ? { background: t.color, borderColor: "transparent" } : {}} onClick={() => setTypeId(t.id)}>{t.name}</button>
+              ))}</div>
+            </div>
+            <div className="field"><label>{mode === "now" ? "Plan (optional)" : "What you did"}</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {iv ? (<>
+                  <label className="field-wrap" style={{ flex: 1, minWidth: 80 }}><span className="muted" style={{ fontSize: 11 }}>Rounds</span><input className="tin mono" inputMode="numeric" value={rounds} onChange={(e) => setRounds(e.target.value)} placeholder="8" /></label>
+                  <label className="field-wrap" style={{ flex: 1, minWidth: 80 }}><span className="muted" style={{ fontSize: 11 }}>Work m:ss</span><input className="tin mono" value={work} onChange={(e) => setWork(e.target.value)} placeholder="0:30" /></label>
+                  <label className="field-wrap" style={{ flex: 1, minWidth: 80 }}><span className="muted" style={{ fontSize: 11 }}>Rest m:ss</span><input className="tin mono" value={rest} onChange={(e) => setRest(e.target.value)} placeholder="1:30" /></label>
+                </>) : (<>
+                  <label className="field-wrap" style={{ flex: 1, minWidth: 90 }}><span className="muted" style={{ fontSize: 11 }}>Minutes</span><input className="tin mono" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="30" /></label>
+                  {TRACKING[ex.trackingType].fields.includes("distance") && <label className="field-wrap" style={{ flex: 1, minWidth: 90 }}><span className="muted" style={{ fontSize: 11 }}>Distance ({dist})</span><input className="tin mono" inputMode="decimal" value={distance} onChange={(e) => setDistance(e.target.value)} placeholder="5" /></label>}
+                </>)}
+              </div>
+            </div>
+            {mode === "past" && (<>
+              <div className="field"><label>Date</label><input className="tin mono" type="date" value={when} max={dayKey(Date.now())} onChange={(e) => setWhen(e.target.value)} /></div>
+              <div className="field"><label>Note (optional)</label><input className="tin" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Easy pace, felt good…" /></div>
+            </>)}
+            {mode === "now"
+              ? <button className="btn acc" style={{ width: "100%", marginTop: 6 }} onClick={() => onStart(ex, plan(), typeId)}><Play size={16} /> Start {ex.name}</button>
+              : <button className="btn acc" style={{ width: "100%", marginTop: 6 }} disabled={!canRecord} onClick={() => onRecord({ ex, date: new Date(when + "T12:00:00").getTime(), typeId, minutes: num(minutes), distance, rounds, work, rest, note })}><Check size={16} /> Save to history</button>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Today({ active, sessions, routines, programs, exById, activeProgramId, unit, restDefault, setTab, onResume, onOpenSettings, onOpenMuscles, exercises, dist, onStartAdhoc, onRecordAdhoc }) {
   const now = new Date();
+  const [adhoc, setAdhoc] = useState(false);
   const activeProg = (programs || []).find((p) => p.id === activeProgramId) || null;
   // last 7 local days
   const days = [];
@@ -1864,6 +1965,7 @@ function Today({ active, sessions, routines, programs, exById, activeProgramId, 
             <div className="muted" style={{ fontSize: 12 }}>{activeProg ? "Active routine: " + activeProg.name : "No active routine"}</div>
             <div style={{ fontWeight: 800, fontSize: 20, margin: "2px 0 10px" }}>Ready to train?</div>
             <button className="btn acc" style={{ width: "100%" }} onClick={() => setTab("routines")}><Play size={16} /> Start a workout</button>
+            <button className="btn ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => setAdhoc(true)}><TrendingUp size={16} /> Log an activity — run, walk, cardio…</button>
           </>
         )}
       </div>
@@ -1907,6 +2009,7 @@ function Today({ active, sessions, routines, programs, exById, activeProgramId, 
         <div className="ch"><div className="t"><Flame size={15} /> Last workout</div>
           {last && <span className="mono" style={{ fontSize: 11, color: "var(--steel)" }}>{relDay(last.date)}</span>}
         </div>
+        {adhoc && <AdhocSheet exercises={exercises} dist={dist} onStart={(ex, plan, t) => { setAdhoc(false); onStartAdhoc(ex, plan, t); }} onRecord={(rec) => { setAdhoc(false); onRecordAdhoc(rec); }} onClose={() => setAdhoc(false)} />}
         {last ? (
           <button className="lrow" style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0 }} onClick={() => setTab("history")}>
             <div className="grow">
@@ -3204,7 +3307,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
   const addExercise = (id) => {
     const ex = exById[id]; if (!ex) return;
     const rtn = routines.find((r) => r.id === active.routineId);
-    if (rtn && !(rtn.exerciseIds || []).includes(id)) { setAdding(false); setPendingAdd(ex); }
+    if (rtn && !active.adhoc && !(rtn.exerciseIds || []).includes(id)) { setAdding(false); setPendingAdd(ex); }
     else doAdd(ex, false);
   };
   const createExercise = (draft) => {
@@ -3471,7 +3574,7 @@ function Workout({ active, saveActive, exById, exercises, sessions, unit, dist, 
         </div>
       ); })()}
       {confirm && (() => {
-        const derived = active.entries.length && active.entries.every((en) => exById[en.exerciseId]?.category === "cardio") ? "cardio" : "weights";
+        const derived = active.type ? active.type : (active.entries.length && active.entries.every((en) => exById[en.exerciseId]?.category === "cardio") ? "cardio" : "weights");
         const chosen = wType || derived;
         return (
           <div className="scrim" onClick={() => setConfirm(false)}>
